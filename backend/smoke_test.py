@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 import sys
 
 import httpx
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:8000")
 API = f"{BASE}/api/v1"
 
 results: list[tuple[str, bool, str]] = []
