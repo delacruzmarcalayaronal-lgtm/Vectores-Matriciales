@@ -18,7 +18,7 @@ router = APIRouter(tags=["users"])
 @router.get("/companies/{company_id}/users", response_model=list[UserOut])
 def list_users(
     company_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ) -> list[UserOut]:
     ensure_company(user, company_id)

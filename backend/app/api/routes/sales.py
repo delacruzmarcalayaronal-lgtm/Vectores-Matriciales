@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...core.deps import ensure_company, get_current_user, require_roles
+from ...core.deps import ensure_company, require_roles
 from ...db import get_db
 from ...models import Branch, InventoryMovement, Product, Sale, SaleDetail, User, utcnow
 from ...schemas import Page, SaleOut, SaleUpsert
@@ -61,7 +61,7 @@ def list_sales(
     endDate: str | None = Query(default=None),
     page: int | None = Query(default=None, ge=1),
     pageSize: int | None = Query(default=None, ge=1),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(*SALES_ROLES)),
     db: Session = Depends(get_db),
 ) -> Page[SaleOut]:
     ensure_company(user, company_id)
@@ -167,7 +167,7 @@ def create_sale(
 @router.get("/sales/{sale_id}", response_model=SaleOut)
 def get_sale(
     sale_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(*SALES_ROLES)),
     db: Session = Depends(get_db),
 ) -> SaleOut:
     sale = get_or_404(db, Sale, sale_id, "Venta")

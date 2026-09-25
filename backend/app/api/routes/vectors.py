@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...core.deps import ensure_company, get_current_user, require_roles
+from ...core.deps import ensure_company, require_roles
 from ...db import get_db
 from ...models import User, Vector
 from ...schemas import VectorOut, VectorUpsert
@@ -19,7 +19,7 @@ VECTOR_ROLES = ("admin", "analyst")
 @router.get("/companies/{company_id}/vectors", response_model=list[VectorOut])
 def list_vectors(
     company_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(*VECTOR_ROLES)),
     db: Session = Depends(get_db),
 ) -> list[VectorOut]:
     ensure_company(user, company_id)
@@ -68,7 +68,7 @@ def create_vector(
 @router.get("/vectors/{vector_id}", response_model=VectorOut)
 def get_vector(
     vector_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(*VECTOR_ROLES)),
     db: Session = Depends(get_db),
 ) -> VectorOut:
     vector = get_or_404(db, Vector, vector_id, "Vector")

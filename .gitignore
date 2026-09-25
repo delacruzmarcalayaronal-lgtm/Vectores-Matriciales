@@ -27,3 +27,6 @@ backend/.env
 
 # Vercel (vinculado por CLI)
 .vercel/
+
+# Secrets locales
+.env*
