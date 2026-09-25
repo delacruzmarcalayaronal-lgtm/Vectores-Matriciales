@@ -1,0 +1,26 @@
+# Node / frontend
+node_modules/
+frontend/dist/
+*.local
+
+# Python / backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Base de datos local (se regenera con el seed)
+backend/matrixflow.db
+*.db
+
+# Secrets (nunca al repo)
+backend/.env
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log

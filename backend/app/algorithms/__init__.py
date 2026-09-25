@@ -1,0 +1,1 @@
+"""Motor matemático (NumPy)."""
