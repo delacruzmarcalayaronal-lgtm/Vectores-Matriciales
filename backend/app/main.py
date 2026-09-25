@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
@@ -88,6 +90,24 @@ async def validation_exception_handler(
             "code": "validation_error",
             "details": {"errors": errors},
         },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    tb = f"UNHANDLED {request.method} {request.url.path}\n{traceback.format_exc()}"
+    print(tb, file=sys.stderr, flush=True)
+    try:
+        from pathlib import Path
+
+        log_path = Path(__file__).resolve().parents[1] / "error.log"
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(tb + "\n")
+    except Exception:
+        pass
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Error interno del servidor", "code": "internal_error"},
     )
 
 
