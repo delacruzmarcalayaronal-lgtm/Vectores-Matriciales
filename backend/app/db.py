@@ -21,11 +21,24 @@ def get_db():
         db.close()
 
 
+def _run_migrations() -> None:
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
+    backend_dir = Path(__file__).resolve().parents[1]
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    command.upgrade(cfg, "head")
+
+
 def init_db() -> None:
     from . import models  # noqa: F401
     from .seed import seed_if_empty
 
-    Base.metadata.create_all(bind=engine)
+    _run_migrations()
     db = SessionLocal()
     try:
         seed_if_empty(db)
