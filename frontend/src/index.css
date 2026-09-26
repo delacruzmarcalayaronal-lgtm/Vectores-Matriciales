@@ -137,11 +137,19 @@ html.dark.theme-matrix {
 }
 
 @media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: #fff !important;
+  }
   body * {
     visibility: hidden !important;
   }
   #carnet-print,
-  #carnet-print * {
+  #carnet-print *,
+  #report-print,
+  #report-print * {
     visibility: visible !important;
   }
   #carnet-print {
@@ -156,5 +164,27 @@ html.dark.theme-matrix {
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+  }
+  #report-print {
+    position: static !important;
+    color: #0F172A !important;
+    background: #fff !important;
+  }
+  #report-print * {
+    color: #0F172A !important;
+    background-color: transparent !important;
+    border-color: #CBD5E1 !important;
+    box-shadow: none !important;
+  }
+  #report-print .recharts-sector,
+  #report-print .recharts-bar-rectangle,
+  #report-print .recharts-line-curve,
+  #report-print .recharts-line-dot,
+  #report-print .recharts-pie-sector path {
+    opacity: 1 !important;
+    filter: none !important;
+  }
+  #report-print .recharts-legend-item-text {
+    color: #334155 !important;
   }
 }

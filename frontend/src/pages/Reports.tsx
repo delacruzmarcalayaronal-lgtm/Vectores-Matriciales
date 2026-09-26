@@ -80,6 +80,20 @@ export function Reports() {
     await queryClient.invalidateQueries({ queryKey: ['reports', 'target-compliance'] });
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPdf = () => {
+    const previousTitle = document.title;
+    document.title = `Reportes_MatrixFlow_${new Date().toISOString().slice(0, 10)}`;
+    show('Elige "Guardar como PDF" en el diálogo de impresión.');
+    window.setTimeout(() => {
+      window.print();
+      document.title = previousTitle;
+    }, 400);
+  };
+
   const openCreateTargetModal = () => {
     setEditingTarget(null);
     reset({
@@ -180,8 +194,8 @@ export function Reports() {
   })) || [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6" id="report-print">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-text">Reportes y Análisis</h1>
           <p className="text-secondary mt-1">Indicadores ejecutivos y análisis de desempeño</p>
@@ -190,17 +204,17 @@ export function Reports() {
           <Button
             variant="outline"
             leftIcon={<Download className="w-4 h-4" />}
-            onClick={() => show('La exportación de reportes estará disponible en una versión futura.')}
+            onClick={handleExportPdf}
           >
             Exportar PDF
           </Button>
-          <Button variant="outline" leftIcon={<Printer className="w-4 h-4" />} onClick={() => window.print()}>
+          <Button variant="outline" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint}>
             Imprimir
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 print:hidden">
         <div className="relative max-w-md flex-1">
           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
           <input
@@ -221,7 +235,7 @@ export function Reports() {
         </div>
       </div>
 
-      <div className="border-b border-border">
+      <div className="border-b border-border print:hidden">
         <nav className="flex gap-1" role="tablist">
           {tabs.map(tab => (
             <button

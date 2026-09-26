@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Save,
   Bell,
@@ -18,6 +18,34 @@ import {
   type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS
 } from '../lib/theme';
 import { useNotice } from '../hooks/useNotice';
+import {
+  companiesApi,
+  salesApi,
+  productsApi,
+  vectorsApi,
+  matricesApi,
+  operationsApi,
+  branchesApi,
+  categoriesApi,
+  inventoryApi
+} from '../services/api';
+import { downloadFile, toCSV, parseCSV, jsonOf } from '../lib/exportUtils';
+
+const COMPANY_ID = '1';
+
+const readPrefs = (key: string): Record<string, unknown> => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const writePrefs = (key: string, value: unknown) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const dateStamp = () => new Date().toISOString().slice(0, 10);
 
 const THEME_CARDS: Record<ThemeMode, { label: string; bg: string; surface: string; text: string; border: string; half?: boolean }> = {
   light: { label: 'Light', bg: '#FFFFFF', surface: '#F1F5F9', text: '#0F172A', border: '#E2E8F0' },
@@ -52,9 +80,67 @@ const TECH_COLORS = [
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
   const [saving, setSaving] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme());
   const [primaryColor, setPrimaryState] = useState<string>(() => getStoredPrimary());
   const { show, notice } = useNotice();
+
+  const [general, setGeneral] = useState({
+    name: '',
+    taxId: '',
+    address: '',
+    city: '',
+    country: '',
+    phone: '',
+    email: '',
+  });
+
+  const [notif, setNotif] = useState<Record<string, boolean>>(() => ({
+    email_alerts: true,
+    stock_alerts: true,
+    target_alerts: true,
+    operation_alerts: false,
+    weekly_report: false,
+    system_updates: false,
+    ...readPrefs('mf_notifications'),
+  }));
+
+  const [security, setSecurity] = useState<Record<string, unknown>>(() => ({
+    sessionMinutes: 480,
+    maxLoginAttempts: 5,
+    accessTokenMinutes: 60,
+    refreshDays: 30,
+    twoFactor: true,
+    idleLock: false,
+    ...readPrefs('mf_security'),
+  }));
+
+  const [apiPrefs, setApiPrefs] = useState<Record<string, unknown>>(() => ({
+    limit: 100,
+    timeout: 30,
+    retries: 3,
+    ...readPrefs('mf_api'),
+  }));
+
+  const productFileRef = useRef<HTMLInputElement>(null);
+  const saleFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    companiesApi.get(COMPANY_ID)
+      .then(c => setGeneral({
+        name: c.name ?? '',
+        taxId: c.taxId ?? '',
+        address: c.address ?? '',
+        city: c.city ?? '',
+        country: c.country ?? '',
+        phone: c.phone ?? '',
+        email: c.email ?? '',
+      }))
+      .catch(err => console.error('Error loading company:', err));
+  }, []);
+
+  const setG = (key: keyof typeof general, value: string) =>
+    setGeneral(prev => ({ ...prev, [key]: value }));
 
   const handleTheme = (mode: ThemeMode) => {
     setThemeMode(mode);
@@ -77,8 +163,240 @@ export function Settings() {
 
   const handleSave = async () => {
     setSaving(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setSaving(false);
+    try {
+      if (activeTab === 'general') {
+        await companiesApi.update(COMPANY_ID, general);
+        show('Datos de la empresa guardados en la base de datos.');
+      } else if (activeTab === 'notifications') {
+        writePrefs('mf_notifications', notif);
+        show('Preferencias de notificaciones guardadas.');
+      } else if (activeTab === 'security') {
+        writePrefs('mf_security', security);
+        show('Configuración de seguridad guardada.');
+      } else if (activeTab === 'api') {
+        writePrefs('mf_api', apiPrefs);
+        show('Configuración de API guardada.');
+      } else {
+        writePrefs('mf_general_misc', { savedAt: new Date().toISOString() });
+        show('Cambios guardados.');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      show('No se pudieron guardar los cambios.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runExport = (key: string, fn: () => Promise<void>) => {
+    setBusyKey(key);
+    fn()
+      .catch(error => {
+        console.error('Export error:', error);
+        show('Error al exportar. Verifica tu sesión e intenta de nuevo.');
+      })
+      .finally(() => setBusyKey(null));
+  };
+
+  const exportSales = () => runExport('exp-sales', async () => {
+    const page = await salesApi.list(COMPANY_ID, { page: 1, pageSize: 10000 });
+    const rows = page.data.map(s => ({
+      numero: s.saleNumber,
+      fecha: s.date,
+      sucursal_id: s.branchId,
+      estado: s.status,
+      subtotal: s.subtotal,
+      impuesto: s.tax,
+      total: s.total,
+      notas: s.notes ?? '',
+      creado: s.createdAt,
+    }));
+    downloadFile(`ventas_${dateStamp()}.csv`, toCSV(rows), 'text/csv');
+    show(`Ventas exportadas: ${rows.length} registros.`);
+  });
+
+  const exportInventory = () => runExport('exp-inventory', async () => {
+    const [branches, products] = await Promise.all([
+      branchesApi.list(COMPANY_ID),
+      productsApi.list(COMPANY_ID),
+    ]);
+    const nameById = new Map(products.map(p => [p.id, p.name]));
+    const rows: Array<Record<string, unknown>> = [];
+    for (const branch of branches) {
+      const stock = await inventoryApi.getStock(COMPANY_ID, branch.id);
+      for (const [productId, qty] of Object.entries(stock)) {
+        rows.push({
+          sucursal: branch.name,
+          producto: nameById.get(productId) ?? productId,
+          producto_id: productId,
+          stock: qty,
+        });
+      }
+    }
+    downloadFile(`inventario_${dateStamp()}.csv`, toCSV(rows), 'text/csv');
+    show(`Inventario exportado: ${rows.length} filas.`);
+  });
+
+  const exportVectors = () => runExport('exp-vectors', async () => {
+    const rows = await vectorsApi.list(COMPANY_ID);
+    downloadFile(`vectores_${dateStamp()}.json`, jsonOf(rows), 'application/json');
+    show(`Vectores exportados: ${rows.length}.`);
+  });
+
+  const exportMatrices = () => runExport('exp-matrices', async () => {
+    const rows = await matricesApi.list(COMPANY_ID);
+    downloadFile(`matrices_${dateStamp()}.json`, jsonOf(rows), 'application/json');
+    show(`Matrices exportadas: ${rows.length}.`);
+  });
+
+  const exportHistory = () => runExport('exp-history', async () => {
+    const page = await operationsApi.list(COMPANY_ID, { page: 1, pageSize: 10000 });
+    const rows = page.data.map(op => ({
+      tipo: op.type,
+      nombre: op.name,
+      descripcion: op.description ?? '',
+      estado: op.status,
+      tiempo_ms: op.executionTimeMs,
+      vectores_entrada: op.inputVectors.join(' '),
+      matrices_entrada: op.inputMatrices.join(' '),
+      fecha: new Date(op.createdAt).toISOString(),
+    }));
+    downloadFile(`historial_${dateStamp()}.csv`, toCSV(rows), 'text/csv');
+    show(`Historial exportado: ${rows.length} operaciones.`);
+  });
+
+  const exportBackup = () => runExport('exp-backup', async () => {
+    const [company, branches, categories, products, sales, vectors, matrices, operations] = await Promise.all([
+      companiesApi.get(COMPANY_ID),
+      branchesApi.list(COMPANY_ID),
+      categoriesApi.list(COMPANY_ID),
+      productsApi.list(COMPANY_ID),
+      salesApi.list(COMPANY_ID, { page: 1, pageSize: 10000 }),
+      vectorsApi.list(COMPANY_ID),
+      matricesApi.list(COMPANY_ID),
+      operationsApi.list(COMPANY_ID, { page: 1, pageSize: 10000 }),
+    ]);
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      company,
+      branches,
+      categories,
+      products,
+      sales: sales.data,
+      vectors,
+      matrices,
+      operations: operations.data,
+    };
+    downloadFile(`respaldo_matrixflow_${dateStamp()}.json`, jsonOf(backup), 'application/json');
+    show('Respaldo completo descargado (JSON).');
+  });
+
+  const importProducts = (file: File) => {
+    setBusyKey('imp-products');
+    file.text()
+      .then(async text => {
+        const rows = parseCSV(text);
+        if (rows.length === 0) {
+          show('El CSV no tiene filas de datos. Columnas: sku,name,category,unitPrice,costPrice,stock,minStock,unit,description');
+          return;
+        }
+        const categories = await categoriesApi.list(COMPANY_ID);
+        const byName = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
+        let ok = 0;
+        const failed: string[] = [];
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          try {
+            let categoryId = (r.categoryId || r.categoriaId || '').trim();
+            if (!categoryId) {
+              const catName = (r.category || r.categoria || 'Importados').trim();
+              let id = byName.get(catName.toLowerCase());
+              if (!id) {
+                const created = await categoriesApi.create(COMPANY_ID, { name: catName });
+                id = created.id;
+                byName.set(catName.toLowerCase(), id);
+              }
+              categoryId = id;
+            }
+            await productsApi.create(COMPANY_ID, {
+              sku: (r.sku || `IMP-${i + 1}`).slice(0, 20),
+              name: (r.name || r.nombre || '').trim(),
+              description: r.description || r.descripcion || '',
+              categoryId,
+              unitPrice: Number(r.unitPrice ?? r.precio ?? 0),
+              costPrice: Number(r.costPrice ?? r.costo ?? 0),
+              stock: Math.max(0, Math.trunc(Number(r.stock ?? 0))),
+              minStock: Math.max(0, Math.trunc(Number(r.minStock ?? r.stockMinimo ?? 5))),
+              unit: r.unit || r.unidad || 'unidad',
+              isActive: String(r.activo ?? r.isActive ?? 'true').toLowerCase() !== 'false',
+            });
+            ok++;
+          } catch {
+            failed.push(String(i + 2));
+          }
+        }
+        const failMsg = failed.length ? ` | fallaron filas ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? '…' : ''}` : '';
+        show(`Productos importados: ${ok} de ${rows.length}${failMsg}.`);
+      })
+      .catch(error => {
+        console.error('Import products error:', error);
+        show('No se pudo leer el archivo CSV.');
+      })
+      .finally(() => setBusyKey(null));
+  };
+
+  const importSales = (file: File) => {
+    setBusyKey('imp-sales');
+    file.text()
+      .then(async text => {
+        const rows = parseCSV(text);
+        if (rows.length === 0) {
+          show('El CSV no tiene filas de datos. Columnas: branchId|sucursal,productId|sku|producto,quantity,unitPrice,discount,status,notes');
+          return;
+        }
+        const [branches, products] = await Promise.all([
+          branchesApi.list(COMPANY_ID),
+          productsApi.list(COMPANY_ID),
+        ]);
+        const branchById = new Map(branches.map(b => [b.id, b]));
+        const branchByName = new Map(branches.map(b => [b.name.toLowerCase(), b]));
+        const productById = new Map(products.map(p => [p.id, p]));
+        const productBySku = new Map(products.map(p => [p.sku.toLowerCase(), p]));
+        const productByName = new Map(products.map(p => [p.name.toLowerCase(), p]));
+        let ok = 0;
+        const failed: string[] = [];
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          try {
+            const branchKey = String(r.branchId || r.sucursal || '').toLowerCase();
+            const branch = branchById.get(String(r.branchId || '')) || branchByName.get(branchKey);
+            if (!branch) throw new Error('sucursal no encontrada');
+            const pKey = String(r.productId || r.producto || r.sku || '').toLowerCase();
+            const product = productById.get(String(r.productId || '')) || productBySku.get(pKey) || productByName.get(pKey);
+            if (!product) throw new Error('producto no encontrado');
+            const quantity = Math.max(1, Math.trunc(Number(r.quantity ?? r.cantidad ?? 1)));
+            const unitPrice = Number(r.unitPrice ?? r.precio ?? product.unitPrice);
+            const discount = Math.max(0, Number(r.discount ?? r.descuento ?? 0));
+            const status = String(r.status || 'confirmed');
+            await salesApi.create(COMPANY_ID, {
+              branchId: branch.id,
+              status: (['draft', 'confirmed', 'cancelled'].includes(status) ? status : 'confirmed') as 'draft' | 'confirmed' | 'cancelled',
+              notes: r.notes || r.notas || 'Importado CSV',
+              details: [{ productId: product.id, quantity, unitPrice, discount }],
+            } as unknown as Parameters<typeof salesApi.create>[1]);
+            ok++;
+          } catch {
+            failed.push(String(i + 2));
+          }
+        }
+        const failMsg = failed.length ? ` | fallaron filas ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? '…' : ''}` : '';
+        show(`Ventas importadas: ${ok} de ${rows.length}${failMsg}.`);
+      })
+      .catch(error => {
+        console.error('Import sales error:', error);
+        show('No se pudo leer el archivo CSV.');
+      })
+      .finally(() => setBusyKey(null));
   };
 
   return (
@@ -98,16 +416,16 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Nombre de la Empresa" placeholder="Sin configurar" />
-              <Input label="RUC" placeholder="Sin configurar" />
+              <Input label="Nombre de la Empresa" value={general.name} onChange={e => setG('name', e.target.value)} placeholder="Sin configurar" />
+              <Input label="RUC" value={general.taxId} onChange={e => setG('taxId', e.target.value)} placeholder="Sin configurar" />
             </div>
-            <Input label="Dirección" placeholder="Sin configurar" />
+            <Input label="Dirección" value={general.address} onChange={e => setG('address', e.target.value)} placeholder="Sin configurar" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Input label="Ciudad" placeholder="Sin configurar" />
-              <Input label="País" placeholder="Sin configurar" />
-              <Input label="Teléfono" placeholder="Sin configurar" />
+              <Input label="Ciudad" value={general.city} onChange={e => setG('city', e.target.value)} placeholder="Sin configurar" />
+              <Input label="País" value={general.country} onChange={e => setG('country', e.target.value)} placeholder="Sin configurar" />
+              <Input label="Teléfono" value={general.phone} onChange={e => setG('phone', e.target.value)} placeholder="Sin configurar" />
             </div>
-            <Input label="Email Corporativo" type="email" placeholder="Sin configurar" />
+            <Input label="Email Corporativo" type="email" value={general.email} onChange={e => setG('email', e.target.value)} placeholder="Sin configurar" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Select
                 label="Zona Horaria"
@@ -236,7 +554,12 @@ export function Settings() {
                   <p className="text-sm text-secondary">{item.desc}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" defaultChecked={['email_alerts', 'stock_alerts', 'target_alerts'].includes(item.id)} className="sr-only peer" />
+                  <input
+                    type="checkbox"
+                    checked={Boolean(notif[item.id])}
+                    onChange={e => setNotif(prev => ({ ...prev, [item.id]: e.target.checked }))}
+                    className="sr-only peer"
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
@@ -256,12 +579,12 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Tiempo de Sesión (minutos)" type="number" defaultValue="480" />
-              <Input label="Intentos de Login Máximos" type="number" defaultValue="5" />
+              <Input label="Tiempo de Sesión (minutos)" type="number" value={String(security.sessionMinutes ?? 480)} onChange={e => setSecurity(prev => ({ ...prev, sessionMinutes: Number(e.target.value) }))} />
+              <Input label="Intentos de Login Máximos" type="number" value={String(security.maxLoginAttempts ?? 5)} onChange={e => setSecurity(prev => ({ ...prev, maxLoginAttempts: Number(e.target.value) }))} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Duración Token Acceso (min)" type="number" defaultValue="60" />
-              <Input label="Duración Token Refresh (días)" type="number" defaultValue="30" />
+              <Input label="Duración Token Acceso (min)" type="number" value={String(security.accessTokenMinutes ?? 60)} onChange={e => setSecurity(prev => ({ ...prev, accessTokenMinutes: Number(e.target.value) }))} />
+              <Input label="Duración Token Refresh (días)" type="number" value={String(security.refreshDays ?? 30)} onChange={e => setSecurity(prev => ({ ...prev, refreshDays: Number(e.target.value) }))} />
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-border">
@@ -270,7 +593,12 @@ export function Settings() {
                   <p className="text-sm text-secondary">Requerir 2FA para todos los administradores</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" defaultChecked className="sr-only peer" />
+                  <input
+                    type="checkbox"
+                    checked={Boolean(security.twoFactor)}
+                    onChange={e => setSecurity(prev => ({ ...prev, twoFactor: e.target.checked }))}
+                    className="sr-only peer"
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
@@ -280,7 +608,12 @@ export function Settings() {
                   <p className="text-sm text-secondary">Cerrar sesión automáticamente tras inactividad</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input
+                    type="checkbox"
+                    checked={Boolean(security.idleLock)}
+                    onChange={e => setSecurity(prev => ({ ...prev, idleLock: e.target.checked }))}
+                    className="sr-only peer"
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
@@ -300,36 +633,72 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h4 className="font-medium text-text mb-4">Respaldos Automáticos</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Select
-                  label="Frecuencia"
-                  defaultValue="daily"
-                  options={[
-                    { value: 'hourly', label: 'Cada hora' },
-                    { value: 'daily', label: 'Diario' },
-                    { value: 'weekly', label: 'Semanal' },
-                  ]}
-                />
-                <Input label="Hora" type="time" defaultValue="02:00" />
-                <Input label="Retención (días)" type="number" defaultValue="30" />
-              </div>
+              <h4 className="font-medium text-text mb-2">Respaldo Completo</h4>
+              <p className="text-sm text-secondary mb-4">Descarga un snapshot JSON con empresa, sucursales, categorías, productos, ventas, vectores, matrices e historial.</p>
+              <Button
+                variant="outline"
+                leftIcon={<Download className="w-4 h-4" />}
+                loading={busyKey === 'exp-backup'}
+                onClick={exportBackup}
+              >
+                Descargar Respaldo (JSON)
+              </Button>
             </div>
             <div className="pt-4 border-t border-border">
               <h4 className="font-medium text-text mb-4">Exportar Datos</h4>
               <div className="flex flex-wrap gap-4">
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Ventas (CSV)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Inventario (CSV)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Vectores (JSON)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Matrices (JSON)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Historial (CSV)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} loading={busyKey === 'exp-sales'} onClick={exportSales}>Exportar Ventas (CSV)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} loading={busyKey === 'exp-inventory'} onClick={exportInventory}>Exportar Inventario (CSV)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} loading={busyKey === 'exp-vectors'} onClick={exportVectors}>Exportar Vectores (JSON)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} loading={busyKey === 'exp-matrices'} onClick={exportMatrices}>Exportar Matrices (JSON)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} loading={busyKey === 'exp-history'} onClick={exportHistory}>Exportar Historial (CSV)</Button>
               </div>
             </div>
             <div className="pt-4 border-t border-border">
               <h4 className="font-medium text-text mb-4">Importar Datos</h4>
               <div className="flex flex-wrap gap-4">
-                <Button variant="outline" leftIcon={<Upload className="w-4 h-4" />} onClick={() => show('La importación de datos estará disponible en una versión futura.')}>Importar Productos</Button>
-                <Button variant="outline" leftIcon={<Upload className="w-4 h-4" />} onClick={() => show('La importación de datos estará disponible en una versión futura.')}>Importar Ventas</Button>
+                <Button
+                  variant="outline"
+                  leftIcon={<Upload className="w-4 h-4" />}
+                  loading={busyKey === 'imp-products'}
+                  onClick={() => productFileRef.current?.click()}
+                >
+                  Importar Productos (CSV)
+                </Button>
+                <Button
+                  variant="outline"
+                  leftIcon={<Upload className="w-4 h-4" />}
+                  loading={busyKey === 'imp-sales'}
+                  onClick={() => saleFileRef.current?.click()}
+                >
+                  Importar Ventas (CSV)
+                </Button>
+              </div>
+              <input
+                ref={productFileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) importProducts(file);
+                  e.target.value = '';
+                }}
+              />
+              <input
+                ref={saleFileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) importSales(file);
+                  e.target.value = '';
+                }}
+              />
+              <div className="mt-4 text-xs text-secondary space-y-1">
+                <p><span className="font-medium text-text">Productos CSV:</span> sku,name,category,unitPrice,costPrice,stock,minStock,unit,description (category se crea si no existe; acepta nombres en español: nombre,precio,costo).</p>
+                <p><span className="font-medium text-text">Ventas CSV:</span> branchId|sucursal,productId|sku|producto,quantity,unitPrice,discount,status,notes (sucursal y producto pueden ir por nombre o ID; una fila = una venta).</p>
               </div>
             </div>
           </CardContent>
@@ -343,12 +712,12 @@ export function Settings() {
             <CardDescription>Endpoints, claves y límites de tasa</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Input label="URL Base API" defaultValue="http://localhost:8000/api/v1" />
-            <Input label="Clave API" type="password" defaultValue="••••••••••••••••" />
+            <Input label="URL Base API" value={String(import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1')} readOnly />
+            <p className="text-xs text-secondary">La URL base la define la variable de entorno VITE_API_URL del despliegue (Vercel) y no puede cambiarse desde la interfaz.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Input label="Límite Requests/min" type="number" defaultValue="100" />
-              <Input label="Timeout (segundos)" type="number" defaultValue="30" />
-              <Input label="Reintentos" type="number" defaultValue="3" />
+              <Input label="Límite Requests/min" type="number" value={String(apiPrefs.limit ?? 100)} onChange={e => setApiPrefs(prev => ({ ...prev, limit: Number(e.target.value) }))} />
+              <Input label="Timeout (segundos)" type="number" value={String(apiPrefs.timeout ?? 30)} onChange={e => setApiPrefs(prev => ({ ...prev, timeout: Number(e.target.value) }))} />
+              <Input label="Reintentos" type="number" value={String(apiPrefs.retries ?? 3)} onChange={e => setApiPrefs(prev => ({ ...prev, retries: Number(e.target.value) }))} />
             </div>
             <div className="flex justify-end pt-4 border-t border-border">
               <Button onClick={handleSave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>Guardar Cambios</Button>

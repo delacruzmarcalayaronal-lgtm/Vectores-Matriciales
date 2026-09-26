@@ -19,7 +19,7 @@ export function useNotice(durationMs = 3500) {
   const notice = message ? (
     <div
       role="status"
-      className="fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 bg-text text-white text-sm rounded-lg shadow-lg border border-border"
+      className="fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 bg-slate-900 text-white text-sm rounded-lg shadow-xl border border-slate-600"
     >
       {message}
     </div>

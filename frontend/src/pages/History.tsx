@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Search, Eye, Calculator, Minus, Plus, Divide, RotateCcw, Layers, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Search, Eye, Calculator, Minus, Plus, Divide, RotateCcw, Layers, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
-import { Table, Badge } from '../components/ui/Table';
+import { Table, Badge, Modal } from '../components/ui/Table';
 import { useOperations } from '../hooks/useApi';
 import { useNotice } from '../hooks/useNotice';
+import { operationsApi } from '../services/api';
+import { downloadFile, toCSV } from '../lib/exportUtils';
 import type { Operation, OperationType } from '../types';
 
 const typeIcons: Record<OperationType, React.ReactNode> = {
@@ -39,8 +41,35 @@ export function History() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const [viewingOperation, setViewingOperation] = useState<Operation | null>(null);
   const pageSize = 15;
   const { show, notice } = useNotice();
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const page = await operationsApi.list('1', { page: 1, pageSize: 10000 });
+      const rows = page.data.map(op => ({
+        tipo: op.type,
+        nombre: op.name,
+        descripcion: op.description ?? '',
+        estado: op.status,
+        tiempo_ms: op.executionTimeMs,
+        vectores_entrada: op.inputVectors.join(' '),
+        matrices_entrada: op.inputMatrices.join(' '),
+        fecha: new Date(op.createdAt).toISOString(),
+      }));
+      const filename = `historial_operaciones_${new Date().toISOString().slice(0, 10)}.csv`;
+      downloadFile(filename, toCSV(rows), 'text/csv');
+      show(`Historial exportado: ${rows.length} operaciones (${filename}).`);
+    } catch (error) {
+      console.error('Error exporting history:', error);
+      show('No se pudo exportar el historial. Intenta nuevamente.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data: operationsData, isLoading } = useOperations('1', {
     page: currentPage,
@@ -75,8 +104,9 @@ export function History() {
         </div>
         <Button
           variant="outline"
-          leftIcon={<Filter className="w-4 h-4" />}
-          onClick={() => show('La exportación de historial estará disponible en una versión futura.')}
+          leftIcon={<Download className="w-4 h-4" />}
+          loading={exporting}
+          onClick={handleExport}
         >
           Exportar
         </Button>
@@ -137,9 +167,9 @@ export function History() {
               { key: 'status', header: 'Estado', render: (row) => getStatusBadge(row.status) },
               { key: 'executionTime', header: 'Tiempo', render: (row) => <span className="font-mono">{row.executionTimeMs} ms</span> },
               { key: 'createdAt', header: 'Fecha', render: (row) => new Date(row.createdAt).toLocaleString('es-PE') },
-              { key: 'actions', header: 'Acciones', render: (_row) => (
+              { key: 'actions', header: 'Acciones', render: (row) => (
                 <div className="flex items-center gap-1">
-                  <button className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Ver detalle"><Eye className="w-4 h-4" /></button>
+                  <button onClick={() => setViewingOperation(row)} className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Ver detalle"><Eye className="w-4 h-4" /></button>
                 </div>
               )},
             ]}
@@ -166,6 +196,48 @@ export function History() {
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={!!viewingOperation}
+        onClose={() => setViewingOperation(null)}
+        title="Detalle de la Operación"
+        description={viewingOperation ? `${typeLabels[viewingOperation.type] ?? viewingOperation.type} — ${viewingOperation.name}` : ''}
+        size="lg"
+      >
+        {viewingOperation && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-secondary">Estado:</span> {getStatusBadge(viewingOperation.status)}</div>
+              <div><span className="text-secondary">Tiempo:</span> <span className="font-mono">{viewingOperation.executionTimeMs} ms</span></div>
+              <div><span className="text-secondary">Fecha:</span> {new Date(viewingOperation.createdAt).toLocaleString('es-PE')}</div>
+              <div><span className="text-secondary">Descripción:</span> {viewingOperation.description || '—'}</div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text mb-2">Parámetros</p>
+              <pre className="text-xs bg-gray-50 border border-border rounded-lg p-3 max-h-40 overflow-auto">
+                {JSON.stringify(viewingOperation.parameters ?? {}, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text mb-2">Salida</p>
+              <pre className="text-xs bg-gray-50 border border-border rounded-lg p-3 max-h-40 overflow-auto">
+                {JSON.stringify({
+                  estado: viewingOperation.status,
+                  error: viewingOperation.errorMessage ?? null,
+                  vectorResultado: viewingOperation.resultVectorId ?? null,
+                  matrizResultado: viewingOperation.resultMatrixId ?? null,
+                }, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text mb-2">Entradas</p>
+              <pre className="text-xs bg-gray-50 border border-border rounded-lg p-3 max-h-40 overflow-auto">
+                {JSON.stringify({ vectores: viewingOperation.inputVectors, matrices: viewingOperation.inputMatrices }, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
+      </Modal>
       {notice}
     </div>
   );

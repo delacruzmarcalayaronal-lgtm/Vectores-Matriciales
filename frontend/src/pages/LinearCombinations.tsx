@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRef } from 'react';
 import { Plus, Calculator, SlidersHorizontal, Target, Copy, Download } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -14,6 +15,7 @@ export function LinearCombinations() {
   const [weights, setWeights] = useState<Record<string, number>>({});
   const [_isModalOpen, setIsModalOpen] = useState(false);
   const [viewingResult, setViewingResult] = useState<any>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   const { data: vectors } = useVectors('1');
   const executeOperation = useExecuteOperation('1');
@@ -51,6 +53,12 @@ export function LinearCombinations() {
 
   const openModal = () => {
     setIsModalOpen(true);
+    const form = formRef.current;
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const first = form.querySelector<HTMLInputElement>('input[type="text"]');
+      window.setTimeout(() => first?.focus(), 400);
+    }
   };
 
   const onSubmit = async (data: LinearComboForm) => {
@@ -130,7 +138,7 @@ export function LinearCombinations() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form ref={formRef} onSubmit={handleSubmit(onSubmit)} id="lc-form">
               <Input label="Nombre" {...register('name')} error={errors.name?.message} placeholder="Indicador Ventas Ponderado" />
               <Input label="Descripción" {...register('description')} placeholder="Combinación ponderada de ventas por sucursal" />
               

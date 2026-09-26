@@ -130,7 +130,7 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen sidebar-gradient transition-all duration-300 z-50 flex flex-col w-64',
+        'fixed left-0 top-0 h-screen sidebar-gradient transition-all duration-300 z-50 flex flex-col w-64 print:hidden',
         expanded ? 'lg:w-64' : 'lg:w-16',
         isOpen || isDesktop ? 'translate-x-0' : '-translate-x-full'
       )}
@@ -185,7 +185,7 @@ export function Header({
   return (
     <header
       className={clsx(
-        'h-16 bg-white border-b border-border fixed top-0 left-0 right-0 z-30 flex items-center px-4 sm:px-6 transition-[padding] duration-300',
+        'h-16 bg-white border-b border-border fixed top-0 left-0 right-0 z-30 flex items-center px-4 sm:px-6 transition-[padding] duration-300 print:hidden',
         hasSidebar && (sidebarExpanded ? 'lg:pl-72' : 'lg:pl-24')
       )}
     >
