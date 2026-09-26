@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   BarChart,
   Bar,
@@ -45,7 +46,6 @@ const COLORS = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6'
 
 export function Reports() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [activeTab, setActiveTab] = useState('overview');
   const [editingTarget, setEditingTarget] = useState<Target | null>(null);
   const [deletingTarget, setDeletingTarget] = useState<Target | null>(null);
   const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
@@ -161,6 +161,11 @@ export function Reports() {
     { id: 'inventory', label: 'Inventario', icon: <BarChart className="w-4 h-4" /> },
     { id: 'operations', label: 'Operaciones', icon: <BarChart className="w-4 h-4" /> },
   ];
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const activeTab = tabs.some(tab => tab.id === requestedTab) ? requestedTab! : 'overview';
+  const setActiveTab = (id: string) => setSearchParams({ tab: id }, { replace: true });
 
   const branchChartData = salesByBranch?.map((item, i) => ({
     name: item.branch.name,

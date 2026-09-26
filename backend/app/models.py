@@ -23,7 +23,6 @@ class Company(Base):
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str] = mapped_column(String(50), default="")
-    email: Mapped[str] = mapped_column(String(120), default="")
     logo: Mapped[str | None] = mapped_column(String(255), nullable=True)
     createdAt: Mapped[str] = mapped_column(String(40), default=utcnow)
     updatedAt: Mapped[str] = mapped_column(String(40), default=utcnow)
@@ -34,7 +33,6 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
     companyId: Mapped[str] = mapped_column(String(40), index=True)
-    email: Mapped[str] = mapped_column(String(120), default="")
     name: Mapped[str] = mapped_column(String(120))
     dni: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True, index=True)
     role: Mapped[str] = mapped_column(String(20), default="operator")
@@ -56,7 +54,6 @@ class Branch(Base):
     city: Mapped[str] = mapped_column(String(100), default="")
     country: Mapped[str] = mapped_column(String(100), default="")
     phone: Mapped[str] = mapped_column(String(50), default="")
-    email: Mapped[str] = mapped_column(String(120), default="")
     isActive: Mapped[bool] = mapped_column(default=True)
     createdAt: Mapped[str] = mapped_column(String(40), default=utcnow)
     updatedAt: Mapped[str] = mapped_column(String(40), default=utcnow)
@@ -216,6 +213,43 @@ class Operation(Base):
     errorMessage: Mapped[str | None] = mapped_column(Text, nullable=True)
     executionTimeMs: Mapped[float] = mapped_column(Float, default=0.0)
     createdAt: Mapped[str] = mapped_column(String(40), default=utcnow)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    companyId: Mapped[str] = mapped_column(String(40), index=True)
+    userId: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    type: Mapped[str] = mapped_column(String(40), default="system")
+    title: Mapped[str] = mapped_column(String(160))
+    message: Mapped[str] = mapped_column(Text, default="")
+    link: Mapped[str] = mapped_column(String(255), default="/dashboard")
+    dedupKey: Mapped[str] = mapped_column(String(120), default="")
+    createdAt: Mapped[str] = mapped_column(String(40), default=utcnow, index=True)
+    updatedAt: Mapped[str] = mapped_column(String(40), default=utcnow)
+
+    reads: Mapped[list["NotificationRead"]] = relationship(
+        "NotificationRead",
+        back_populates="notification",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class NotificationRead(Base):
+    __tablename__ = "notification_reads"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    notificationId: Mapped[str] = mapped_column(
+        String(40), ForeignKey("notifications.id"), index=True
+    )
+    userId: Mapped[str] = mapped_column(String(40), index=True)
+    readAt: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    dismissedAt: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    createdAt: Mapped[str] = mapped_column(String(40), default=utcnow)
+
+    notification: Mapped["Notification"] = relationship("Notification", back_populates="reads")
 
 
 class AuditLog(Base):

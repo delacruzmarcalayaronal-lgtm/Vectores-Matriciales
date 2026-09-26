@@ -2,7 +2,7 @@ import { createContext } from 'react';
 import type { User } from '../types';
 import type { ModuleKey } from '../lib/permissions';
 
-export type ProfilePatch = Partial<Pick<User, 'name' | 'email' | 'role' | 'avatar'>>;
+export type ProfilePatch = Partial<Pick<User, 'name' | 'role' | 'avatar'>>;
 
 export interface AuthContextType {
   user: User | null;

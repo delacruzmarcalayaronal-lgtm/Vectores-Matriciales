@@ -38,6 +38,7 @@ from .math import (
     VectorOut,
     VectorUpsert,
 )
+from .notifications import NotificationOut, NotificationType, NotificationUpsert
 from .reports import (
     DashboardStatsOut,
     InventoryRotationOut,
@@ -63,6 +64,9 @@ __all__ = [
     "LoginIn",
     "MatrixOut",
     "MatrixUpsert",
+    "NotificationOut",
+    "NotificationType",
+    "NotificationUpsert",
     "OperationExecuteIn",
     "OperationOut",
     "OperationType",

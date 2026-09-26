@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Calculator, IdCard, Loader2, ShieldCheck, AlertCircle, UserPlus, LogIn, Grid3x3, BarChart3, Lock, ScanFace } from 'lucide-react';
 import { FaceScanner } from '../components/auth/FaceScanner';
@@ -6,6 +6,7 @@ import { SmokeField } from '../components/auth/SmokeField';
 import { useAuth } from '../contexts/useAuth';
 import { DEMO_USERS } from '../services/mockApi';
 import { ROLE_LABELS, ROLE_ICONS } from '../lib/permissions';
+import { readBgMotion, BG_MOTION_EVENT } from '../lib/bgMotion';
 
 type AuthMode = 'login' | 'register';
 type LoginMethod = 'dni' | 'face';
@@ -21,6 +22,17 @@ export function Login() {
   const [faceVerified, setFaceVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [bgMotion, setBgMotion] = useState(readBgMotion);
+
+  useEffect(() => {
+    const onChange = () => setBgMotion(readBgMotion());
+    window.addEventListener(BG_MOTION_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener(BG_MOTION_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
 
   const dniValid = /^\d{8}$/.test(dni);
   const nameValid = mode === 'login' || name.trim().length >= 3;
@@ -90,7 +102,9 @@ export function Login() {
 
   return (
     <div className="min-h-screen bg-bg relative overflow-hidden flex">
-      <SmokeField />
+      {bgMotion.enabled && (
+        <SmokeField density={bgMotion.density} speed={bgMotion.speed} interactive={bgMotion.interactive} />
+      )}
       <div className="hidden lg:flex w-1/2 relative z-10 overflow-hidden flex-col justify-between p-10">
 
         <div className="relative flex items-center gap-3">

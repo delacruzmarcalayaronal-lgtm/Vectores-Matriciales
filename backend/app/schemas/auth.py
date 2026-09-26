@@ -11,7 +11,6 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    email: str
     name: str
     dni: str | None = None
     role: Role
@@ -47,7 +46,6 @@ class RefreshIn(BaseModel):
 class UserCreate(BaseModel):
     name: str
     password: str
-    email: str | None = None
     dni: str | None = None
     role: Role = "operator"
     avatar: str | None = None
@@ -56,7 +54,6 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     name: str | None = None
-    email: str | None = None
     dni: str | None = None
     role: Role | None = None
     avatar: str | None = None

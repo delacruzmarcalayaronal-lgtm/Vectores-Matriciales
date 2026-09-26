@@ -42,7 +42,6 @@ export function Profile() {
   const carnetRef = useRef<HTMLCanvasElement>(null);
 
   const [name, setName] = useState(user?.name ?? '');
-  const [email, setEmail] = useState(user?.email ?? '');
   const [role, setRole] = useState<Role>(user?.role ?? 'operator');
   const [avatar, setAvatar] = useState<string | undefined>(user?.avatar);
   const [error, setError] = useState('');
@@ -80,19 +79,14 @@ export function Profile() {
 
   const handleSave = async () => {
     const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
 
     if (trimmedName.length < 2) {
       setError('El nombre debe tener al menos 2 caracteres');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError('Ingresa un email válido');
-      return;
-    }
 
     try {
-      await updateProfile({ name: trimmedName, email: trimmedEmail, role, avatar });
+      await updateProfile({ name: trimmedName, role, avatar });
       setError('');
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
@@ -175,7 +169,6 @@ export function Profile() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Nombre completo" value={name} onChange={e => { setName(e.target.value); setSaved(false); }} placeholder="Tu nombre" />
-            <Input label="Email" type="email" value={email} onChange={e => { setEmail(e.target.value); setSaved(false); }} placeholder="tucorreo@empresa.com" />
             <Select label="Rol" value={role} onChange={e => { setRole(e.target.value as Role); setSaved(false); }} options={roleOptions} />
             <Input label="DNI" value={user.dni || '—'} readOnly disabled className="font-mono" />
           </div>

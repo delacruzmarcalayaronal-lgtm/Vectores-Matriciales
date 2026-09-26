@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, MapPin, Phone, Mail } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, MapPin, Phone } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
@@ -38,7 +38,7 @@ export function Branches() {
 
   const openCreateModal = () => {
     setEditingBranch(null);
-    reset({ name: '', code: '', address: '', city: '', country: 'Perú', phone: '', email: '', isActive: true });
+    reset({ name: '', code: '', address: '', city: '', country: 'Perú', phone: '', isActive: true });
     setIsModalOpen(true);
   };
 
@@ -51,7 +51,6 @@ export function Branches() {
       city: branch.city,
       country: branch.country,
       phone: branch.phone,
-      email: branch.email,
       isActive: branch.isActive,
     });
     setIsModalOpen(true);
@@ -122,9 +121,6 @@ export function Branches() {
               { key: 'phone', header: 'Teléfono', render: (row) => (
                 <span className="flex items-center gap-1"><Phone className="w-4 h-4" />{row.phone || '-'}</span>
               )},
-              { key: 'email', header: 'Email', render: (row) => (
-                <span className="flex items-center gap-1"><Mail className="w-4 h-4" />{row.email || '-'}</span>
-              )},
               { key: 'isActive', header: 'Estado', render: (row) => (
                 <Badge variant={row.isActive ? 'success' : 'danger'}>
                   {row.isActive ? 'Activa' : 'Inactiva'}
@@ -172,10 +168,7 @@ export function Branches() {
             <Input label="Ciudad" {...register('city')} error={errors.city?.message} />
             <Input label="País" {...register('country')} error={errors.country?.message} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Teléfono" type="tel" {...register('phone')} error={errors.phone?.message} />
-            <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />
-          </div>
+          <Input label="Teléfono" type="tel" {...register('phone')} error={errors.phone?.message} />
           <div className="flex items-center gap-2">
             <input
               type="checkbox"

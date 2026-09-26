@@ -46,7 +46,6 @@ export function Users() {
 
   const filteredUsers = users.filter(u =>
     (u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
       (u.dni || '').includes(search)) &&
     (roleFilter === 'all' || u.role === roleFilter)
   );
@@ -57,13 +56,13 @@ export function Users() {
 
   const openCreateModal = () => {
     setEditingUser(null);
-    reset({ name: '', email: '', dni: '', role: 'operator', password: '' });
+    reset({ name: '', dni: '', role: 'operator', password: '' });
     setIsModalOpen(true);
   };
 
   const openEditModal = (user: User) => {
     setEditingUser(user);
-    reset({ name: user.name, email: user.email, dni: user.dni || '', role: user.role, password: '' });
+    reset({ name: user.name, dni: user.dni || '', role: user.role, password: '' });
     setIsModalOpen(true);
   };
 
@@ -73,7 +72,7 @@ export function Users() {
         const { password, ...rest } = data as UserUpdateForm;
         await updateUser.mutateAsync({
           id: editingUser.id,
-          data: { ...rest, email: rest.email || undefined, ...(password ? { password } : {}) },
+          data: { ...rest, ...(password ? { password } : {}) },
         });
       } else {
         await createUser.mutateAsync(data as UserCreateForm);
@@ -114,7 +113,7 @@ export function Users() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
               <input
                 type="text"
-                placeholder="Buscar por nombre, correo o DNI..."
+                placeholder="Buscar por nombre o DNI..."
                 value={search}
                 onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -145,7 +144,7 @@ export function Users() {
                     <Avatar name={row.name} size="sm" />
                     <div>
                       <p className="font-medium text-text">{row.name}</p>
-                      <p className="text-xs text-secondary">{row.email}</p>
+                      <p className="text-xs text-secondary font-mono">DNI {row.dni || '—'}</p>
                     </div>
                   </div>
                 ),
@@ -205,7 +204,6 @@ export function Users() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input label="Nombre completo" {...register('name')} error={errors.name?.message} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />
             <Input label="DNI" {...register('dni')} error={errors.dni?.message} placeholder="12345678" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -250,7 +248,7 @@ export function Users() {
               <Avatar name={viewingUser.name} size="lg" />
               <div>
                 <p className="text-lg font-semibold text-text">{viewingUser.name}</p>
-                <p className="text-sm text-secondary">{viewingUser.email}</p>
+                <p className="text-sm text-secondary font-mono">DNI {viewingUser.dni || '—'}</p>
               </div>
             </div>
             <dl className="grid grid-cols-2 gap-4 text-sm">

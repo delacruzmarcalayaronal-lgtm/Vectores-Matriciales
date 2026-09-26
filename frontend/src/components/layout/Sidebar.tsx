@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
+import { NotificationBell } from '../notifications/NotificationBell';
+import { OnlineStatus } from './OnlineStatus';
 import { useAuth } from '../../contexts/useAuth';
 import { type ModuleKey } from '../../lib/permissions';
 
@@ -38,10 +40,10 @@ const moduleItems: NavItem[] = [
   { label: 'Análisis Matemático', href: '/analisis', icon: <Calculator className="w-5 h-5" />, module: 'vectores' },
   { label: 'Historial', href: '/historial', icon: <History className="w-5 h-5" />, module: 'historial' },
   { label: 'Reportes', href: '/reportes', icon: <FileText className="w-5 h-5" />, module: 'reportes' },
-  { label: 'Mapa de Ubicaciones', href: '/geografia', icon: <Map className="w-5 h-5" />, module: 'geografia' },
-  { label: 'Identidad Facial', href: '/identidad', icon: <ScanFace className="w-5 h-5" />, module: 'identidad' },
   { label: 'Usuarios', href: '/usuarios', icon: <Users className="w-5 h-5" />, module: 'usuarios' },
   { label: 'Configuración', href: '/configuracion', icon: <Settings className="w-5 h-5" />, module: 'configuracion' },
+  { label: 'Mapa de Ubicaciones', href: '/geografia', icon: <Map className="w-5 h-5" />, module: 'geografia' },
+  { label: 'Identidad Facial', href: '/identidad', icon: <ScanFace className="w-5 h-5" />, module: 'identidad' },
 ];
 
 function useIsDesktop() {
@@ -212,10 +214,8 @@ export function Header({
       <div className="flex-1 flex items-center justify-between min-w-0">
         <h1 className="text-base sm:text-xl font-semibold text-text truncate">MatrixFlow Enterprise</h1>
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm text-secondary">
-            <span className="w-2 h-2 rounded-full bg-success" />
-            En línea
-          </div>
+          <NotificationBell />
+          <OnlineStatus className="hidden sm:flex" />
           {!hasSidebar && (
             <ProfileAvatar
               size="sm"

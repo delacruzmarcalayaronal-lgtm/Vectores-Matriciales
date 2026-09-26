@@ -43,13 +43,9 @@ def create_user(
         existing = db.scalar(select(User).where(User.dni == body.dni))
         if existing is not None:
             raise HTTPException(status_code=400, detail="Ese DNI ya está registrado")
-    email = body.email or (
-        f"{body.dni}@matrixflow.local" if body.dni else f"usuario{len(db.scalars(select(User)).all()) + 1}@matrixflow.local"
-    )
     new_user = User(
         id=new_id(),
         companyId=company_id,
-        email=email,
         name=body.name,
         dni=body.dni,
         role=body.role,

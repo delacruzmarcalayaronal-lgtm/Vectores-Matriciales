@@ -23,7 +23,6 @@ class CompanyOut(BaseModel):
     city: str | None = None
     country: str | None = None
     phone: str
-    email: str
     logo: str | None = None
     createdAt: str
     updatedAt: str
@@ -37,7 +36,6 @@ class CompanyUpsert(BaseModel):
     city: str | None = None
     country: str | None = None
     phone: str | None = None
-    email: str | None = None
     logo: str | None = None
 
 
@@ -52,7 +50,6 @@ class BranchOut(BaseModel):
     city: str
     country: str
     phone: str
-    email: str
     isActive: bool
     createdAt: str
     updatedAt: str
@@ -65,7 +62,6 @@ class BranchUpsert(BaseModel):
     city: str | None = None
     country: str | None = None
     phone: str | None = None
-    email: str | None = None
     isActive: bool | None = None
 
 

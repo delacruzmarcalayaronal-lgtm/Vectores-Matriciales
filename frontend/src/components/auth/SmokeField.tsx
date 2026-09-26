@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { type BgDensity, DEFAULT_BG_MOTION } from '../../lib/bgMotion';
 
 const PALETTE: Array<[number, number, number]> = [
   [34, 211, 238],
@@ -80,7 +81,23 @@ function makeSprite(color: [number, number, number]): HTMLCanvasElement {
 const rgba = (c: [number, number, number], a: number) =>
   `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
 
-export function SmokeField() {
+export interface SmokeFieldProps {
+  density?: BgDensity;
+  speed?: number;
+  interactive?: boolean;
+}
+
+const DENSITY_COUNTS: Record<BgDensity, { smoke: number; spark: number }> = {
+  low: { smoke: 40, spark: 24 },
+  medium: { smoke: 84, spark: 48 },
+  high: { smoke: 140, spark: 80 },
+};
+
+export function SmokeField({
+  density = DEFAULT_BG_MOTION.density,
+  speed = DEFAULT_BG_MOTION.speed,
+  interactive = DEFAULT_BG_MOTION.interactive,
+}: SmokeFieldProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -124,8 +141,8 @@ export function SmokeField() {
     };
     resize();
 
-    const SMOKE_COUNT = 84;
-    const SPARK_COUNT = 48;
+    const SMOKE_COUNT = DENSITY_COUNTS[density].smoke;
+    const SPARK_COUNT = DENSITY_COUNTS[density].spark;
 
     const placeAll = () => {
       smoke.length = 0;
@@ -217,7 +234,9 @@ export function SmokeField() {
       mouse.x = -9999;
       mouse.y = -9999;
     };
+    const BURST_EXCLUDE = 'button, a, input, select, textarea, label, [role="tab"], [role="button"], [role="switch"], [role="menuitem"], [role="dialog"], [role="status"]';
     const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest(BURST_EXCLUDE)) return;
       const pos = toLocal(e.clientX, e.clientY);
       if (pos.inside) burst(pos.x, pos.y);
     };
@@ -227,6 +246,12 @@ export function SmokeField() {
     window.addEventListener('mouseout', onLeave);
     window.addEventListener('click', onClick);
     window.addEventListener('resize', onResize);
+    if (!interactive) {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseout', onLeave);
+      window.removeEventListener('click', onClick);
+      mouse.active = false;
+    }
 
     let running = true;
     const onVisibility = () => {
@@ -243,8 +268,8 @@ export function SmokeField() {
         return;
       }
       if (!placed) placeAll();
-      time += 1;
-      if (time % 30 === 1) refreshThemeColors();
+      time += speed;
+      if (time % 30 < speed) refreshThemeColors();
 
       const dark = document.documentElement.classList.contains('dark');
       const glowComp = dark ? 'lighter' : 'source-over';
@@ -411,7 +436,7 @@ export function SmokeField() {
       window.removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [density, speed, interactive]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full print:hidden" aria-hidden="true" />;
 }

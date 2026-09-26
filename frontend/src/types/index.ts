@@ -2,7 +2,6 @@ export type Role = 'admin' | 'manager' | 'analyst' | 'operator';
 
 export interface User {
   id: string;
-  email: string;
   name: string;
   dni?: string;
   role: Role;
@@ -21,7 +20,6 @@ export interface Company {
   city?: string;
   country?: string;
   phone: string;
-  email: string;
   logo?: string;
   createdAt: string;
   updatedAt: string;
@@ -36,7 +34,6 @@ export interface Branch {
   city: string;
   country: string;
   phone: string;
-  email: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -255,4 +252,28 @@ export interface AuthResponse {
   user: User;
   accessToken: string;
   refreshToken: string;
+}
+
+export type NotificationType = 'stock' | 'target' | 'operation' | 'system' | 'sales' | 'security';
+
+export interface AppNotification {
+  id: string;
+  companyId: string;
+  userId?: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link: string;
+  createdAt: string;
+  isRead: boolean;
+  isDismissed: boolean;
+}
+
+export interface NotificationInput {
+  type: NotificationType;
+  title: string;
+  message: string;
+  link: string;
+  dedupKey: string;
+  userId?: string | null;
 }

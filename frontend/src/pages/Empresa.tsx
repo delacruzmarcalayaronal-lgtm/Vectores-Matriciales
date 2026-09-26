@@ -102,16 +102,12 @@ export function Empresa() {
                     <p className="text-text">{company?.phone || '—'}</p>
                   </div>
                   <div>
-                    <label className="text-sm text-secondary">Email</label>
-                    <p className="text-text">{company?.email || '—'}</p>
-                  </div>
-                  <div>
                     <label className="text-sm text-secondary">Ciudad / País</label>
                     <p className="text-text">{[company?.city, company?.country].filter(Boolean).join(' / ') || '—'}</p>
                   </div>
                   <div>
-                    <label className="text-sm text-secondary">Estado</label>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Activa</span>
+                    <label className="text-sm text-secondary block">Estado</label>
+                    <span className="inline-flex items-center mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Activa</span>
                   </div>
                 </div>
               </div>

@@ -16,7 +16,8 @@ import type {
   AuditLog,
   DashboardStats,
   User,
-  
+  AppNotification,
+  NotificationInput,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -276,4 +277,30 @@ export const usersApi = {
 export const auditApi = {
   list: (companyId: string, params?: { userId?: string; module?: string; startDate?: string; endDate?: string; page?: number; pageSize?: number }) =>
     unwrap(api.get<{ data: AuditLog[]; total: number }>(`/companies/${companyId}/audit`, { params })),
+};
+
+export const notificationsApi = {
+  list: (companyId: string) =>
+    unwrap(api.get<AppNotification[]>(`/companies/${companyId}/notifications`)),
+  create: (companyId: string, data: NotificationInput) =>
+    unwrap(api.post<AppNotification>(`/companies/${companyId}/notifications`, data)),
+  read: (id: string) => unwrap(api.post<{ message: string }>(`/notifications/${id}/read`)),
+  dismiss: (id: string) => unwrap(api.post<{ message: string }>(`/notifications/${id}/dismiss`)),
+  readAll: (companyId: string) =>
+    unwrap(api.post<{ message: string; count: number }>(`/companies/${companyId}/notifications/read-all`)),
+};
+
+const HEALTH_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '') + '/health';
+
+export const healthApi = {
+  check: async (): Promise<{ online: boolean }> => {
+    try {
+      const response = await fetch(HEALTH_URL, { cache: 'no-store' });
+      if (!response.ok) return { online: false };
+      const data = (await response.json()) as { status?: string; database?: string };
+      return { online: data.status === 'ok' && data.database === 'ok' };
+    } catch {
+      return { online: false };
+    }
+  },
 };

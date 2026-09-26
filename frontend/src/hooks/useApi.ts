@@ -13,10 +13,12 @@ import type {
   OperationType,
   User,
   DashboardStats,
-  AuditLog
+  AuditLog,
+  AppNotification,
+  NotificationInput,
 } from '../types';
-import { authApi, companiesApi, branchesApi, productsApi, categoriesApi, salesApi, inventoryApi, targetsApi, vectorsApi, matricesApi, operationsApi, reportsApi, usersApi, auditApi } from '../services/api';
-import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockCategoriesApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi } from '../services/mockApi';
+import { authApi, companiesApi, branchesApi, productsApi, categoriesApi, salesApi, inventoryApi, targetsApi, vectorsApi, matricesApi, operationsApi, reportsApi, usersApi, auditApi, notificationsApi } from '../services/api';
+import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockCategoriesApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi, mockNotificationsApi } from '../services/mockApi';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 
@@ -35,6 +37,7 @@ const getApi = () => USE_MOCK ? {
   reports: mockReportsApi,
   users: mockUsersApi,
   audit: mockAuditApi,
+  notifications: mockNotificationsApi,
 } : {
   auth: authApi,
   companies: companiesApi,
@@ -50,6 +53,7 @@ const getApi = () => USE_MOCK ? {
   reports: reportsApi,
   users: usersApi,
   audit: auditApi,
+  notifications: notificationsApi,
 };
 
 export const useAuth = () => {
@@ -444,5 +448,111 @@ export function useDeleteProduct() {
   return useMutation({
     mutationFn: (id: string) => api.products.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+  });
+}
+
+const NOTIF_POLL_MS = 30000;
+
+export function useNotifications(companyId: string, options?: UseQueryOptions<AppNotification[]>) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['notifications', companyId],
+    queryFn: () => api.notifications.list(companyId),
+    refetchInterval: NOTIF_POLL_MS,
+    ...options,
+  });
+}
+
+export function useNotificationActions(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['notifications', companyId] });
+  return {
+    read: (id: string) => api.notifications.read(id).then(r => { invalidate(); return r; }),
+    dismiss: (id: string) => api.notifications.dismiss(id).then(r => { invalidate(); return r; }),
+    readAll: () => api.notifications.readAll(companyId).then(r => { invalidate(); return r; }),
+    create: (data: NotificationInput) => api.notifications.create(companyId, data).then(r => { invalidate(); return r; }),
+  };
+}
+
+const readNotifPrefs = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem('mf_notifications') || '{}'); } catch { return {}; }
+};
+
+export function useNotificationSync(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const prefs = readNotifPrefs();
+      const enabled = (key: string, fallback: boolean) => prefs[key] ?? fallback;
+      const items: NotificationInput[] = [];
+
+      if (enabled('stock_alerts', true)) {
+        const products = await api.products.list(companyId);
+        const low = products.filter(p => p.isActive !== false && p.stock <= p.minStock).slice(0, 8);
+        for (const p of low) {
+          items.push({
+            type: 'stock',
+            title: 'Stock bajo',
+            message: `${p.name}: ${p.stock} unidades (mínimo ${p.minStock}). Revisa el inventario.`,
+            link: '/inventario',
+            dedupKey: `stock-${p.id}`,
+          });
+        }
+      }
+
+      if (enabled('target_alerts', true)) {
+        const targets = await api.targets.list(companyId);
+        const pending = targets.filter(t => t.targetValue > 0 && t.achievedValue < t.targetValue).slice(0, 8);
+        for (const t of pending) {
+          const compliance = Math.round((t.achievedValue / t.targetValue) * 100);
+          items.push({
+            type: 'target',
+            title: 'Meta pendiente',
+            message: `Meta ${t.period || t.type}: ${compliance}% de cumplimiento (S/ ${t.achievedValue.toFixed(0)} de S/ ${t.targetValue.toFixed(0)}).`,
+            link: '/reportes?tab=targets',
+            dedupKey: `target-${t.id}`,
+          });
+        }
+      }
+
+      if (enabled('operation_alerts', true)) {
+        const page = await api.operations.list(companyId);
+        const ops = page.data || [];
+        const failed = ops.filter(o => o.status === 'failed').slice(0, 5);
+        for (const o of failed) {
+          items.push({
+            type: 'operation',
+            title: 'Operación fallida',
+            message: `${o.name}: ${o.errorMessage || 'error al ejecutar'}. Corrígela desde el historial.`,
+            link: '/historial',
+            dedupKey: `op-failed-${o.id}`,
+          });
+        }
+        const last = ops[0];
+        if (last) {
+          items.push({
+            type: 'operation',
+            title: 'Nueva operación registrada',
+            message: `${last.name} — ${last.status === 'completed' ? 'completada' : last.status}.`,
+            link: '/historial',
+            dedupKey: `op-last-${last.id}`,
+          });
+        }
+      }
+
+      let created = 0;
+      for (const item of items) {
+        try {
+          await api.notifications.create(companyId, item);
+          created++;
+        } catch {
+          // una notificación que falla no debe romper la sincronía
+        }
+      }
+      return created;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', companyId] }),
   });
 }

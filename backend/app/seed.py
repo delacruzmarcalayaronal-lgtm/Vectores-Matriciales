@@ -83,7 +83,6 @@ def seed_if_empty(db: Session) -> None:
         city="Lima",
         country="Perú",
         phone="+51 1 555 0123",
-        email="contacto@matrixflow.pe",
         createdAt="2026-01-10T10:00:00+00:00",
         updatedAt="2026-01-10T10:00:00+00:00",
     )
@@ -100,7 +99,6 @@ def seed_if_empty(db: Session) -> None:
             User(
                 id=dni,
                 companyId="1",
-                email=f"{dni}@matrixflow.local",
                 name=name,
                 dni=dni,
                 role=role,
@@ -127,7 +125,6 @@ def seed_if_empty(db: Session) -> None:
                 city=city,
                 country="Perú",
                 phone="+51 1 555 0100",
-                email=f"{code.lower()}@matrixflow.pe",
                 isActive=True,
                 createdAt="2026-01-12T10:00:00+00:00",
                 updatedAt="2026-01-12T10:00:00+00:00",

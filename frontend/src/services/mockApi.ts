@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   User,
   Company,
   Branch,
@@ -12,7 +12,9 @@ import type {
   Operation,
   DashboardStats,
   AuditLog,
-  Role
+  Role,
+  AppNotification,
+  NotificationInput,
 } from '../types';
 
 const MOCK_DELAY = 300;
@@ -21,7 +23,6 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const mockUser: User = {
   id: '1',
-  email: 'admin@matrixflow.local',
   name: 'Administrador MatrixFlow',
   dni: '12345678',
   role: 'admin',
@@ -39,7 +40,6 @@ export const mockCompany: Company = {
   city: '',
   country: '',
   phone: '',
-  email: '',
   createdAt: '2026-01-10T10:00:00Z',
   updatedAt: '2026-01-10T10:00:00Z',
 };
@@ -81,7 +81,7 @@ export const DEMO_USERS: Array<{ dni: string; name: string; role: Role }> = [
   { dni: '12345678', name: 'Administrador MatrixFlow', role: 'admin' },
   { dni: '22222222', name: 'Carmen Salazar', role: 'manager' },
   { dni: '33333333', name: 'Diego Quispe', role: 'analyst' },
-  { dni: '44444444', name: 'Lucía Huamán', role: 'operator' },
+  { dni: '44444444', name: 'LucÃ­a HuamÃ¡n', role: 'operator' },
 ];
 
 const readRegistered = (): RegisteredUser[] => {
@@ -101,7 +101,7 @@ const isValidDni = (dni: string) => /^\d{8}$/.test(dni);
 const findDemoUser = (dni: string) => DEMO_USERS.find(user => user.dni === dni);
 
 const buildSession = (dni: string, name: string, role: Role) => ({
-  user: { ...mockUser, id: dni, dni, name, email: `${dni}@matrixflow.local`, role },
+  user: { ...mockUser, id: dni, dni, name, role },
   accessToken: `mock-access-${dni}`,
   refreshToken: `mock-refresh-${dni}`,
 });
@@ -112,12 +112,12 @@ export const mockAuth = {
   login: async (credentials: { dni: string }) => {
     await delay(MOCK_DELAY);
     const dni = (credentials.dni || '').trim();
-    if (!isValidDni(dni)) throw new Error('El DNI debe tener exactamente 8 dígitos');
+    if (!isValidDni(dni)) throw new Error('El DNI debe tener exactamente 8 dÃ­gitos');
     const demo = findDemoUser(dni);
     if (demo) return sessionFor(demo.dni, demo.name, demo.role);
     const registered = readRegistered().find(u => u.dni === dni);
     if (registered) return sessionFor(dni, registered.name, registered.role);
-    throw new Error('DNI no registrado. Crea tu cuenta en la pestaña Registro.');
+    throw new Error('DNI no registrado. Crea tu cuenta en la pestaÃ±a Registro.');
   },
   loginWithFace: async (credentials: { dni?: string } = {}) => {
     const dni = (credentials.dni || '').trim();
@@ -132,9 +132,9 @@ export const mockAuth = {
     await delay(MOCK_DELAY);
     const dni = (credentials.dni || '').trim();
     const name = (credentials.name || '').trim();
-    if (!isValidDni(dni)) throw new Error('El DNI debe tener exactamente 8 dígitos');
+    if (!isValidDni(dni)) throw new Error('El DNI debe tener exactamente 8 dÃ­gitos');
     if (name.length < 3) throw new Error('Ingresa tu nombre completo');
-    if (findDemoUser(dni)) throw new Error('Este DNI ya tiene una cuenta de demostración');
+    if (findDemoUser(dni)) throw new Error('Este DNI ya tiene una cuenta de demostraciÃ³n');
     const registered = readRegistered();
     if (registered.some(u => u.dni === dni)) {
       throw new Error('Este DNI ya tiene una cuenta registrada');
@@ -147,11 +147,11 @@ export const mockAuth = {
     const token = localStorage.getItem('accessToken') || '';
     const dni = token.startsWith('mock-access-') ? token.slice('mock-access-'.length) : '';
     const demo = dni ? findDemoUser(dni) : undefined;
-    if (demo) return { ...mockUser, id: dni, dni, name: demo.name, email: `${dni}@matrixflow.local`, role: demo.role };
+    if (demo) return { ...mockUser, id: dni, dni, name: demo.name, role: demo.role };
     if (dni) {
       const registered = readRegistered().find(u => u.dni === dni);
       if (registered) {
-        return { ...mockUser, id: dni, dni, name: registered.name, email: `${dni}@matrixflow.local`, role: registered.role };
+        return { ...mockUser, id: dni, dni, name: registered.name, role: registered.role };
       }
     }
     return mockUser;
@@ -172,7 +172,7 @@ export const mockBranchesApi = {
       id: String(Date.now()), companyId,
       name: data.name || 'Nueva Sede', code: data.code || 'NEW01',
       address: data.address || '', city: data.city || '', country: data.country || '',
-      phone: data.phone || '', email: data.email || '', isActive: data.isActive ?? true,
+      phone: data.phone || '', isActive: data.isActive ?? true,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     mockBranches.push(branch);
@@ -306,7 +306,7 @@ export const mockCategoriesApi = {
   create: async (companyId: string, data: Partial<Category>) => {
     await delay(MOCK_DELAY);
     const category: Category = {
-      id: String(Date.now()), companyId, name: data.name || 'Nueva categoría',
+      id: String(Date.now()), companyId, name: data.name || 'Nueva categorÃ­a',
       description: data.description || '', createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -427,7 +427,6 @@ export const mockUsersApi = {
       id: r.dni,
       dni: r.dni,
       name: r.name,
-      email: `${r.dni}@matrixflow.local`,
       role: r.role,
     }));
     return registeredUsers;
@@ -437,7 +436,7 @@ export const mockUsersApi = {
     await delay(MOCK_DELAY);
     const user: User = {
       ...mockUser, id: String(Date.now()), companyId, name: data.name || 'Nuevo Usuario',
-      email: data.email || `${data.dni}@matrixflow.local`, dni: data.dni || '',
+      dni: data.dni || '',
       role: (data.role as Role) || 'operator', createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -452,4 +451,70 @@ export const mockUsersApi = {
 
 export const mockAuditApi = {
   list: async (_companyId: string) => { await delay(MOCK_DELAY); return { data: mockAuditLogs, total: mockAuditLogs.length }; },
+};
+
+const MOCK_NOTIF_KEY = 'mf_mock_notifications';
+const MOCK_NOTIF_STATE_KEY = 'mf_mock_notification_state';
+
+const readMockNotifs = (): StoredNotification[] => {
+  try { return JSON.parse(localStorage.getItem(MOCK_NOTIF_KEY) || '[]'); } catch { return []; }
+};
+const writeMockNotifs = (rows: StoredNotification[]) => localStorage.setItem(MOCK_NOTIF_KEY, JSON.stringify(rows));
+const readNotifState = (): Record<string, { readAt?: string; dismissedAt?: string }> => {
+  try { return JSON.parse(localStorage.getItem(MOCK_NOTIF_STATE_KEY) || '{}'); } catch { return {}; }
+};
+const writeNotifState = (state: Record<string, { readAt?: string; dismissedAt?: string }>) =>
+  localStorage.setItem(MOCK_NOTIF_STATE_KEY, JSON.stringify(state));
+
+type StoredNotification = AppNotification & { dedupKey?: string };
+
+const withState = (n: AppNotification): AppNotification => {
+  const s = readNotifState()[n.id];
+  return { ...n, isRead: Boolean(s?.readAt), isDismissed: Boolean(s?.dismissedAt) };
+};
+
+export const mockNotificationsApi = {
+  list: async (_companyId: string) => { await delay(MOCK_DELAY); return readMockNotifs().map(withState); },
+  create: async (_companyId: string, data: NotificationInput) => {
+    await delay(MOCK_DELAY);
+    const rows = readMockNotifs();
+    let existing = rows.find(r => r.dedupKey === data.dedupKey);
+    if (!existing) {
+      existing = {
+        id: `n${Date.now()}${Math.floor(Math.random() * 1000)}`,
+        companyId: '1', userId: data.userId ?? null, type: data.type,
+        title: data.title, message: data.message, link: data.link,
+        createdAt: new Date().toISOString(), isRead: false, isDismissed: false,
+        dedupKey: data.dedupKey,
+      };
+      rows.unshift(existing);
+      writeMockNotifs(rows);
+    }
+    return withState(existing);
+  },
+  read: async (id: string) => {
+    await delay(MOCK_DELAY);
+    const state = readNotifState();
+    state[id] = { ...state[id], readAt: new Date().toISOString() };
+    writeNotifState(state);
+    return { message: 'Notificación marcada como leída' };
+  },
+  dismiss: async (id: string) => {
+    await delay(MOCK_DELAY);
+    const state = readNotifState();
+    state[id] = { ...state[id], dismissedAt: new Date().toISOString(), readAt: state[id]?.readAt || new Date().toISOString() };
+    writeNotifState(state);
+    return { message: 'Notificación descartada' };
+  },
+  readAll: async (_companyId: string) => {
+    await delay(MOCK_DELAY);
+    const state = readNotifState();
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const n of readMockNotifs()) {
+      if (!state[n.id]?.readAt && !state[n.id]?.dismissedAt) { state[n.id] = { ...state[n.id], readAt: now }; count++; }
+    }
+    writeNotifState(state);
+    return { message: 'Notificaciones marcadas como leídas', count };
+  },
 };

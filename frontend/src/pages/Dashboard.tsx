@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart,
   DollarSign,
@@ -11,11 +11,14 @@ import {
   Layers,
   Wifi,
   MapPin,
+  Home,
+  Boxes,
+  Target,
   
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { StatCard, type StatCardProps, Avatar } from '../components/ui/Table';
-import { Table, Badge } from '../components/ui/Table';
+import { Table, Badge, Tabs, TabPanel } from '../components/ui/Table';
 import { useDashboardStats, useSalesByBranch, useSalesByProduct, useTargetCompliance, useInventoryRotation, useBranches, useProducts } from '../hooks/useApi';
 import { useAuth } from '../contexts/useAuth';
 import { MODULES, MODULE_COLOR_CLASSES } from '../lib/modules';
@@ -138,6 +141,25 @@ export function Dashboard() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
   const chipClass = 'inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-border text-secondary';
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dashboardTabs = [
+    { id: 'resumen', label: 'Resumen', icon: <Home className="w-4 h-4" /> },
+    ...(showSales ? [{ id: 'ventas', label: 'Ventas', icon: <ShoppingCart className="w-4 h-4" /> }] : []),
+    ...(showInventory ? [{ id: 'inventario', label: 'Inventario', icon: <Boxes className="w-4 h-4" /> }] : []),
+    ...(showTargets ? [{ id: 'metas', label: 'Metas', icon: <Target className="w-4 h-4" /> }] : []),
+  ];
+  const requestedTab = searchParams.get('tab');
+  const activeTab = dashboardTabs.some(tab => tab.id === requestedTab)
+    ? requestedTab!
+    : 'resumen';
+  const handleChange = (id: string) => setSearchParams({ tab: id }, { replace: true });
+
+  const emptyTab = (message: string) => (
+    <Card>
+      <CardContent className="py-8 text-center text-secondary text-sm">{message}</CardContent>
+    </Card>
+  );
+
   const sessionRow = (label: string, value: string) => (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-secondary flex-shrink-0">{label}</dt>
@@ -147,6 +169,9 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <Tabs tabs={dashboardTabs} activeTab={activeTab} onChange={handleChange} />
+
+      <TabPanel id="resumen" activeTab={activeTab}>
       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
         <span className={chipClass}>
           <ShieldCheck className="w-4 h-4 text-primary" />
@@ -209,7 +234,6 @@ export function Dashboard() {
             </div>
             <dl className="space-y-2 text-sm">
               {sessionRow('DNI', user?.dni || '—')}
-              {sessionRow('Email', user?.email || '—')}
               {sessionRow('Último acceso', sessionTime.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' }))}
               {sessionRow('Zona horaria', timezone)}
             </dl>
@@ -275,9 +299,12 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
+      </TabPanel>
 
-      {showSales && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <TabPanel id="ventas" activeTab={activeTab}>
+      {showSales ? (
+      <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Ventas por Sucursal</CardTitle>
@@ -342,134 +369,130 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
-      )}
 
-      {(showTargets || showInventory) && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {showTargets && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cumplimiento de Metas</CardTitle>
-            <CardDescription>Porcentaje de cumplimiento de objetivos por sucursal/producto</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={complianceData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                  <XAxis type="number" tickFormatter={v => `${v}%`} stroke="#64748B" fontSize={12} domain={[0, 120]} />
-                  <YAxis dataKey="name" type="category" width={120} stroke="#64748B" fontSize={12} />
-                  <Tooltip content={metaComplianceTooltip} />
-                  <Bar dataKey="compliance" name="Cumplimiento %" fill="#22C55E" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        )}
-
-        {showInventory && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Rotación de Inventario</CardTitle>
-            <CardDescription>Días de stock y rotación por producto</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rotationData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
-                  <YAxis yAxisId="left" type="number" stroke="#64748B" fontSize={12} />
-                  <YAxis yAxisId="right" orientation="right" type="number" stroke="#64748B" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }}
-                  />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="rotation"
-                    name="Rotación (veces/año)"
-                    stroke="#2563EB"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="daysOfStock"
-                    name="Días de Stock"
-                    stroke="#F59E0B"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Ventas Recientes</CardTitle>
+          <CardDescription>Últimas transacciones registradas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table
+            data={stats?.recentSales || []}
+            columns={[
+              { key: 'saleNumber', header: 'N° Venta', render: (row) => <span className="font-mono">{row.saleNumber}</span> },
+              { key: 'date', header: 'Fecha', render: (row) => new Date(row.date).toLocaleDateString('es-PE') },
+              { key: 'branch', header: 'Sucursal', render: (row) => branches?.find(b => b.id === row.branchId)?.name || row.branchId },
+              { key: 'total', header: 'Total', render: (row) => `S/ ${row.total.toLocaleString()}` },
+              { key: 'status', header: 'Estado', render: (row) => (
+                <Badge variant={row.status === 'confirmed' ? 'success' : row.status === 'draft' ? 'warning' : 'danger'}>
+                  {row.status === 'confirmed' ? 'Confirmada' : row.status === 'draft' ? 'Borrador' : 'Cancelada'}
+                </Badge>
+              )},
+            ]}
+            keyExtractor={row => row.id}
+            emptyMessage="No hay ventas recientes"
+          />
+        </CardContent>
+      </Card>
       </div>
-      )}
+      ) : emptyTab('Tu rol no incluye acceso a las ventas.')}
+      </TabPanel>
 
-      {(showSales || showInventory) && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {showSales && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Ventas Recientes</CardTitle>
-            <CardDescription>Últimas transacciones registradas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table
-              data={stats?.recentSales || []}
-              columns={[
-                { key: 'saleNumber', header: 'N° Venta', render: (row) => <span className="font-mono">{row.saleNumber}</span> },
-                { key: 'date', header: 'Fecha', render: (row) => new Date(row.date).toLocaleDateString('es-PE') },
-                { key: 'branch', header: 'Sucursal', render: (row) => branches?.find(b => b.id === row.branchId)?.name || row.branchId },
-                { key: 'total', header: 'Total', render: (row) => `S/ ${row.total.toLocaleString()}` },
-                { key: 'status', header: 'Estado', render: (row) => (
-                  <Badge variant={row.status === 'confirmed' ? 'success' : row.status === 'draft' ? 'warning' : 'danger'}>
-                    {row.status === 'confirmed' ? 'Confirmada' : row.status === 'draft' ? 'Borrador' : 'Cancelada'}
-                  </Badge>
-                )},
-              ]}
-              keyExtractor={row => row.id}
-              emptyMessage="No hay ventas recientes"
-            />
-          </CardContent>
-        </Card>
-        )}
+      <TabPanel id="inventario" activeTab={activeTab}>
+      {showInventory ? (
+      <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Rotación de Inventario</CardTitle>
+          <CardDescription>Días de stock y rotación por producto</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={rotationData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
+                <YAxis yAxisId="left" type="number" stroke="#64748B" fontSize={12} />
+                <YAxis yAxisId="right" orientation="right" type="number" stroke="#64748B" fontSize={12} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }}
+                />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="rotation"
+                  name="Rotación (veces/año)"
+                  stroke="#2563EB"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="daysOfStock"
+                  name="Días de Stock"
+                  stroke="#F59E0B"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
-        {showInventory && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Movimientos de Inventario</CardTitle>
-            <CardDescription>Últimos ingresos y salidas de stock</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table
-              data={stats?.recentMovements || []}
-              columns={[
-                { key: 'date', header: 'Fecha', render: (row) => new Date(row.date).toLocaleDateString('es-PE') },
-                { key: 'product', header: 'Producto', render: (row) => row.product?.name || row.productId },
-                { key: 'type', header: 'Tipo', render: (row) => (
-                  <Badge variant={row.type === 'in' ? 'success' : row.type === 'out' ? 'danger' : 'info'}>
-                    {row.type === 'in' ? 'Entrada' : row.type === 'out' ? 'Salida' : row.type === 'transfer' ? 'Traslado' : 'Ajuste'}
-                  </Badge>
-                )},
-                { key: 'quantity', header: 'Cantidad', render: (row) => row.quantity },
-                { key: 'reference', header: 'Referencia', render: (row) => row.reference },
-              ]}
-              keyExtractor={row => row.id}
-              emptyMessage="No hay movimientos recientes"
-            />
-          </CardContent>
-        </Card>
-        )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Movimientos de Inventario</CardTitle>
+          <CardDescription>Últimos ingresos y salidas de stock</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table
+            data={stats?.recentMovements || []}
+            columns={[
+              { key: 'date', header: 'Fecha', render: (row) => new Date(row.date).toLocaleDateString('es-PE') },
+              { key: 'product', header: 'Producto', render: (row) => row.product?.name || row.productId },
+              { key: 'type', header: 'Tipo', render: (row) => (
+                <Badge variant={row.type === 'in' ? 'success' : row.type === 'out' ? 'danger' : 'info'}>
+                  {row.type === 'in' ? 'Entrada' : row.type === 'out' ? 'Salida' : row.type === 'transfer' ? 'Traslado' : 'Ajuste'}
+                </Badge>
+              )},
+              { key: 'quantity', header: 'Cantidad', render: (row) => row.quantity },
+              { key: 'reference', header: 'Referencia', render: (row) => row.reference },
+            ]}
+            keyExtractor={row => row.id}
+            emptyMessage="No hay movimientos recientes"
+          />
+        </CardContent>
+      </Card>
       </div>
-      )}
+      ) : emptyTab('Tu rol no incluye acceso al inventario.')}
+      </TabPanel>
+
+      <TabPanel id="metas" activeTab={activeTab}>
+      {showTargets ? (
+      <Card>
+        <CardHeader>
+          <CardTitle>Cumplimiento de Metas</CardTitle>
+          <CardDescription>Porcentaje de cumplimiento de objetivos por sucursal/producto</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={complianceData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                <XAxis type="number" tickFormatter={v => `${v}%`} stroke="#64748B" fontSize={12} domain={[0, 120]} />
+                <YAxis dataKey="name" type="category" width={120} stroke="#64748B" fontSize={12} />
+                <Tooltip content={metaComplianceTooltip} />
+                <Bar dataKey="compliance" name="Cumplimiento %" fill="#22C55E" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+      ) : emptyTab('Tu rol no incluye acceso a las metas.')}
+      </TabPanel>
     </div>
   );
 }

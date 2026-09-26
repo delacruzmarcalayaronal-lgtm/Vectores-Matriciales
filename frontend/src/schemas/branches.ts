@@ -7,7 +7,6 @@ export const branchSchema = z.object({
   city: z.string().min(2, 'La ciudad es requerida'),
   country: z.string().min(2, 'El país es requerido'),
   phone: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
   isActive: z.boolean().default(true),
 });
 

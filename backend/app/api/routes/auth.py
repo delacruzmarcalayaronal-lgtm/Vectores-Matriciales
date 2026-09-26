@@ -90,7 +90,6 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)) 
     user = User(
         id=new_id(),
         companyId=company.id if company else "1",
-        email=f"{dni}@matrixflow.local",
         name=name,
         dni=dni,
         role="operator",

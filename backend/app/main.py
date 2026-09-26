@@ -18,6 +18,7 @@ from .api.routes import (
     companies,
     inventory,
     matrices,
+    notifications,
     operations,
     products,
     reports,
@@ -129,6 +130,7 @@ for route_module in (
     users,
     audit,
     reports,
+    notifications,
 ):
     api_router.include_router(route_module.router)
 
@@ -142,7 +144,19 @@ def root() -> dict:
 
 @app.get("/health", tags=["health"])
 def health() -> dict:
-    return {"status": "ok"}
+    from sqlalchemy import text
+
+    from .db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+    finally:
+        db.close()
+    return {"status": "ok", "database": db_status}
 
 
 def route_path(route: APIRoute) -> str:

@@ -2,13 +2,26 @@ import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { Sidebar, Header } from './Sidebar';
+import { SmokeField } from '../auth/SmokeField';
+import { readBgMotion, BG_MOTION_EVENT } from '../../lib/bgMotion';
 import { useAuth } from '../../contexts/useAuth';
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [bgMotion, setBgMotion] = useState(readBgMotion);
   const { user } = useAuth();
   const hasSidebar = user?.role === 'admin';
+
+  useEffect(() => {
+    const onChange = () => setBgMotion(readBgMotion());
+    window.addEventListener(BG_MOTION_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener(BG_MOTION_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSidebarOpen) return;
@@ -20,7 +33,10 @@ export function Layout() {
   }, [isSidebarOpen]);
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="relative min-h-screen bg-bg">
+      {bgMotion.enabled && (
+        <SmokeField density={bgMotion.density} speed={bgMotion.speed} interactive={bgMotion.interactive} />
+      )}
       {hasSidebar && (
         <Sidebar
           isOpen={isSidebarOpen}

@@ -30,6 +30,7 @@ import {
   inventoryApi
 } from '../services/api';
 import { downloadFile, toCSV, parseCSV, jsonOf } from '../lib/exportUtils';
+import { readBgMotion, writeBgMotion, type BgMotionConfig, type BgDensity } from '../lib/bgMotion';
 
 const COMPANY_ID = '1';
 
@@ -83,7 +84,16 @@ export function Settings() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme());
   const [primaryColor, setPrimaryState] = useState<string>(() => getStoredPrimary());
+  const [bgMotion, setBgMotion] = useState<BgMotionConfig>(() => readBgMotion());
   const { show, notice } = useNotice();
+
+  const updateBgMotion = (patch: Partial<BgMotionConfig>) => {
+    setBgMotion(prev => {
+      const next = { ...prev, ...patch };
+      writeBgMotion(next);
+      return next;
+    });
+  };
 
   const [general, setGeneral] = useState({
     name: '',
@@ -92,14 +102,13 @@ export function Settings() {
     city: '',
     country: '',
     phone: '',
-    email: '',
   });
 
   const [notif, setNotif] = useState<Record<string, boolean>>(() => ({
-    email_alerts: true,
+    bell_alerts: true,
     stock_alerts: true,
     target_alerts: true,
-    operation_alerts: false,
+    operation_alerts: true,
     weekly_report: false,
     system_updates: false,
     ...readPrefs('mf_notifications'),
@@ -134,7 +143,6 @@ export function Settings() {
         city: c.city ?? '',
         country: c.country ?? '',
         phone: c.phone ?? '',
-        email: c.email ?? '',
       }))
       .catch(err => console.error('Error loading company:', err));
   }, []);
@@ -457,7 +465,6 @@ export function Settings() {
               <Input label="País" value={general.country} onChange={e => setG('country', e.target.value)} placeholder="Sin configurar" />
               <Input label="Teléfono" value={general.phone} onChange={e => setG('phone', e.target.value)} placeholder="Sin configurar" />
             </div>
-            <Input label="Email Corporativo" type="email" value={general.email} onChange={e => setG('email', e.target.value)} placeholder="Sin configurar" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Select
                 label="Zona Horaria"
@@ -558,6 +565,66 @@ export function Settings() {
               </div>
               <p className="text-xs text-secondary mt-3">El cambio se aplica de inmediato y queda guardado en este navegador.</p>
             </div>
+            <div className="pt-4 border-t border-border">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-text">Fondo animado e interactivo</p>
+                  <p className="text-sm text-secondary">Partículas de fondo en el login y en todas las páginas de la aplicación</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={bgMotion.enabled}
+                    onChange={e => updateBgMotion({ enabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+              {bgMotion.enabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <Select
+                    label="Densidad de partículas"
+                    value={bgMotion.density}
+                    onChange={e => updateBgMotion({ density: e.target.value as BgDensity })}
+                    options={[
+                      { value: 'low', label: 'Baja (más fluido)' },
+                      { value: 'medium', label: 'Media (equilibrado)' },
+                      { value: 'high', label: 'Alta (más partículas)' },
+                    ]}
+                  />
+                  <Select
+                    label="Velocidad de animación"
+                    value={String(bgMotion.speed)}
+                    onChange={e => updateBgMotion({ speed: Number(e.target.value) })}
+                    options={[
+                      { value: '0.5', label: 'Lenta' },
+                      { value: '1', label: 'Normal' },
+                      { value: '1.5', label: 'Rápida' },
+                      { value: '2', label: 'Muy rápida' },
+                    ]}
+                  />
+                  <div className="flex items-center justify-between gap-4 sm:col-span-2 py-3 border-t border-border">
+                    <div>
+                      <p className="font-medium text-text">Interacción con el mouse</p>
+                      <p className="text-sm text-secondary">Las partículas reaccionan al cursor y rebotan al hacer clic en zonas vacías</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={bgMotion.interactive}
+                        onChange={e => updateBgMotion({ interactive: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                  <p className="text-xs text-secondary sm:col-span-2">
+                    En dispositivos con poco rendimiento elige densidad baja o apaga el fondo.
+                  </p>
+                </div>
+              )}
+            </div>
             <div className="flex justify-end pt-4 border-t border-border">
               <Button onClick={handleSave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>Guardar Cambios</Button>
             </div>
@@ -573,7 +640,7 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { id: 'email_alerts', label: 'Alertas por Email', desc: 'Recibir notificaciones importantes por correo electrónico' },
+              { id: 'bell_alerts', label: 'Alertas en la campana', desc: 'Mostrar notificaciones en el botón de campana del encabezado' },
               { id: 'stock_alerts', label: 'Alertas de Stock Bajo', desc: 'Notificar cuando productos alcancen stock mínimo' },
               { id: 'target_alerts', label: 'Alertas de Metas', desc: 'Avisar cuando el cumplimiento de metas sea bajo' },
               { id: 'operation_alerts', label: 'Resultados de Operaciones', desc: 'Notificar cuando operaciones matemáticas terminen' },
