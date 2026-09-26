@@ -34,6 +34,7 @@ import {
 } from '../hooks/useApi';
 import { useAuth } from '../contexts/useAuth';
 import { useNotice } from '../hooks/useNotice';
+import { innerPercentLabel, darkTooltipStyle, legendFormatter } from '../lib/chartLabels';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -274,11 +275,11 @@ export function Reports() {
               <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={productChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="revenue" nameKey="name" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+                    <Pie data={productChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="revenue" nameKey="name" label={innerPercentLabel} labelLine={false}>
                       {productChartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(value) => [`S/ ${Number(value ?? 0).toLocaleString()}`, 'Ingresos']} contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }} />
-                    <Legend />
+                    <Tooltip formatter={(value) => [`S/ ${Number(value ?? 0).toLocaleString()}`, 'Ingresos']} contentStyle={darkTooltipStyle} />
+                    <Legend formatter={legendFormatter} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

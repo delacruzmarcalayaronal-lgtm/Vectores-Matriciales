@@ -2,7 +2,7 @@ import { Building2, Package, ShoppingCart, FileText } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { StatCard, Tabs, TabPanel } from '../components/ui/Table';
-import { useBranches, useDashboardStats } from '../hooks/useApi';
+import { useBranches, useDashboardStats, useCompany } from '../hooks/useApi';
 import { useAuth } from '../contexts/useAuth';
 import { type ModuleKey } from '../lib/permissions';
 import { Branches } from './Branches';
@@ -17,6 +17,7 @@ const TABS: Array<{ id: string; label: string; icon: React.ReactNode; module: Mo
 export function Empresa() {
   const { data: stats } = useDashboardStats('1');
   const { data: branches } = useBranches('1');
+  const { data: company } = useCompany('1');
   const { can } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -80,33 +81,33 @@ export function Empresa() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm text-secondary">Nombre Comercial</label>
-                    <p className="text-text font-medium">—</p>
+                    <p className="text-text font-medium">{company?.name || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-secondary">Razón Social</label>
-                    <p className="text-text font-medium">—</p>
+                    <p className="text-text font-medium">{company?.legalName || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-secondary">RUC</label>
-                    <p className="text-text font-mono">—</p>
+                    <p className="text-text font-mono">{company?.taxId || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-secondary">Dirección</label>
-                    <p className="text-text">—</p>
+                    <p className="text-text">{company?.address || '—'}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm text-secondary">Teléfono</label>
-                    <p className="text-text">—</p>
+                    <p className="text-text">{company?.phone || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-secondary">Email</label>
-                    <p className="text-text">—</p>
+                    <p className="text-text">{company?.email || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-secondary">Ciudad / País</label>
-                    <p className="text-text">—</p>
+                    <p className="text-text">{[company?.city, company?.country].filter(Boolean).join(' / ') || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-secondary">Estado</label>

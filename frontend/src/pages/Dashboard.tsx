@@ -20,6 +20,7 @@ import { useDashboardStats, useSalesByBranch, useSalesByProduct, useTargetCompli
 import { useAuth } from '../contexts/useAuth';
 import { MODULES, MODULE_COLOR_CLASSES } from '../lib/modules';
 import { ROLE_LABELS, ROLE_ICONS, type ModuleKey } from '../lib/permissions';
+import { innerPercentLabel, darkTooltipStyle, legendFormatter } from '../lib/chartLabels';
 import {
   BarChart,
   Bar,
@@ -323,7 +324,7 @@ export function Dashboard() {
                     paddingAngle={2}
                     dataKey="revenue"
                     nameKey="name"
-                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                    label={innerPercentLabel}
                     labelLine={false}
                   >
                     {productChartData.map((_, i) => (
@@ -332,9 +333,9 @@ export function Dashboard() {
                   </Pie>
                   <Tooltip
                     formatter={(value) => [`S/ ${Number(value ?? 0).toLocaleString()}`, 'Ingresos']}
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }}
+                    contentStyle={darkTooltipStyle}
                   />
-                  <Legend />
+                  <Legend formatter={legendFormatter} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
