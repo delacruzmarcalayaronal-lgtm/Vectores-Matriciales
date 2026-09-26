@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from app.services.location_service import LocationService
 
-# sede estándar (SENATI Independencia): dentro del geofence por defecto
-SEDE = {"latitude": -11.9990329, "longitude": -77.0603744}
+# sede estándar (SENATI Sede Central, Av. Alfredo Mendiola 3520-3540): dentro del geofence
+SEDE = {"latitude": -11.9998026, "longitude": -77.0616537}
 LIMA = SEDE
 
 
@@ -143,6 +145,39 @@ class TestAdminMap:
             if body["latitude"] is not None:
                 found_with_location = True
         assert found_with_location, "ningún worker con ubicación registrada"
+
+    def test_live_map_shows_distance_to_headquarters(self, client, admin_token):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        if not client.get("/api/v1/locations/latest", headers=headers).json():
+            pytest.skip("sin ubicaciones en la caché de sesión")
+        r = client.get("/api/v1/locations/map", headers=headers)
+        assert r.status_code == 200
+        assert "Distancia a la sede" in r.text or "mf-distance-label" in r.text
+
+    def test_live_map_fits_sede_and_workers(self, client, admin_token):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        if not client.get("/api/v1/locations/latest", headers=headers).json():
+            pytest.skip("sin ubicaciones en la caché de sesión")
+        r = client.get("/api/v1/locations/map", headers=headers)
+        assert r.status_code == 200
+        assert "fitBounds" in r.text
+
+    def test_history_map_zooms_to_worker(self, client, admin_token):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        workers = client.get("/api/v1/workers", headers=headers).json()
+        target = None
+        for worker in workers:
+            history = client.get(
+                f"/api/v1/workers/{worker['id']}/history", headers=headers
+            ).json()
+            if history:
+                target = worker["id"]
+                break
+        if target is None:
+            pytest.skip("sin historial en la caché de sesión")
+        r = client.get(f"/api/v1/locations/map/history/{target}", headers=headers)
+        assert r.status_code == 200
+        assert "fitBounds" in r.text or "setView" in r.text
 
 
 class TestSessionPrivacy:

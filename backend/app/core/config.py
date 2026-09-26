@@ -22,9 +22,9 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
-    # Mapa y rastreo de trabajadores (sede estándar: SENATI Independencia)
-    MAP_CENTER_LAT: float = -11.9990329
-    MAP_CENTER_LNG: float = -77.0603744
+    # Mapa y rastreo de trabajadores (sede estándar: SENATI Sede Central, Independencia)
+    MAP_CENTER_LAT: float = -11.9998026
+    MAP_CENTER_LNG: float = -77.0616537
     MAP_ZOOM: int = 14
     LOCATION_INTERVAL_SECONDS: int = 60
     GEOFENCE_DEFAULT_RADIUS_KM: float = 0.5

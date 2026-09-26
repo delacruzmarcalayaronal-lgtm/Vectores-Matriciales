@@ -52,6 +52,50 @@ _POPUP_SCRIPT = """
 """
 
 
+def _distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    from .location_service import LocationService
+
+    return LocationService.calculate_distance_km(lat1, lng1, lat2, lng2)
+
+
+def _distance_label_html(km: float) -> str:
+    text = f"{km:.2f} km" if km < 10 else f"{km:.1f} km"
+    return (
+        "<div style='background:#2563EB;color:#fff;padding:1px 7px;border-radius:999px;"
+        "font:600 11px/1.6 sans-serif;white-space:nowrap;"
+        "box-shadow:0 1px 4px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.5);'>"
+        f"{text}</div>"
+    )
+
+
+def _add_distance_ray(
+    fmap: folium.Map, lat: float, lng: float, center_lat: float, center_lng: float
+) -> float | None:
+    """Dibuja la 'raya' sede -> trabajador con la distancia en km. Devuelve los km."""
+    km = _distance_km(center_lat, center_lng, lat, lng)
+    if km < 0.05:
+        return None
+    folium.PolyLine(
+        [[center_lat, center_lng], [lat, lng]],
+        color="#2563EB",
+        weight=2,
+        dash_array="7 7",
+        opacity=0.8,
+        tooltip=f"{km:.2f} km hasta la sede",
+    ).add_to(fmap)
+    folium.Marker(
+        [(center_lat + lat) / 2, (center_lng + lng) / 2],
+        icon=folium.DivIcon(
+            html=_distance_label_html(km),
+            icon_size=(76, 18),
+            icon_anchor=(38, 9),
+            class_name="mf-distance-label",
+        ),
+        interactive=False,
+    ).add_to(fmap)
+    return km
+
+
 def _popup_html(
     name: str,
     code: str,
@@ -63,10 +107,17 @@ def _popup_html(
 ) -> str:
     acc = f"{accuracy:.0f} m" if accuracy is not None else "s/d"
     labels = {"active": "Activo", "idle": "Ocioso", "offline": "Sin conexión"}
+    km = _distance_km(settings.MAP_CENTER_LAT, settings.MAP_CENTER_LNG, lat, lng)
+    distance_line = (
+        f"<b>Distancia a la sede:</b> {km:.2f} km<br>"
+        if km >= 0.01
+        else "<b>En la sede</b><br>"
+    )
     return (
         f"<div style='font-family:sans-serif;font-size:12px'>"
         f"<b>{name}</b><br>Código: {code}<br>Última vez: {seen}<br>"
-        f"Precisión: {acc}<br>Estado: {labels.get(status, status)}"
+        f"Precisión: {acc}<br>Estado: {labels.get(status, status)}<br>"
+        f"{distance_line}"
         f"<div style='margin-top:6px;border-top:1px solid #ddd;padding-top:4px'>"
         f"<b>Coordenadas:</b> "
         f"<span data-mf-lat='{lat:.6f}' data-mf-lng='{lng:.6f}'>{lat:.6f}, {lng:.6f}</span><br>"
@@ -78,9 +129,16 @@ def _popup_html(
 
 
 def _trace_popup_html(title: str, when: str, lat: float, lng: float) -> str:
+    km = _distance_km(settings.MAP_CENTER_LAT, settings.MAP_CENTER_LNG, lat, lng)
+    distance_line = (
+        f"<b>Distancia a la sede:</b> {km:.2f} km<br>"
+        if km >= 0.01
+        else "<b>En la sede</b><br>"
+    )
     return (
         f"<div style='font-family:sans-serif;font-size:12px'>"
-        f"<b>{title}</b><br>{when}"
+        f"<b>{title}</b><br>{when}<br>"
+        f"{distance_line}"
         f"<div style='margin-top:6px;border-top:1px solid #ddd;padding-top:4px'>"
         f"<b>Coordenadas:</b> "
         f"<span data-mf-lat='{lat:.6f}' data-mf-lng='{lng:.6f}'>{lat:.6f}, {lng:.6f}</span><br>"
@@ -100,6 +158,9 @@ def generate_workers_map(locations: list[WorkerLastLocation]) -> str:
     )
     for row in locations:
         color = STATUS_COLORS.get(row.status, "gray")
+        _add_distance_ray(
+            fmap, row.latitude, row.longitude, settings.MAP_CENTER_LAT, settings.MAP_CENTER_LNG
+        )
         folium.Marker(
             location=[row.latitude, row.longitude],
             popup=folium.Popup(
@@ -126,6 +187,11 @@ def generate_workers_map(locations: list[WorkerLastLocation]) -> str:
             tooltip="Sin trabajadores con ubicación",
             icon=folium.Icon(color="gray", icon="info-sign"),
         ).add_to(fmap)
+    else:
+        # encuadrar la sede y a todos los trabajadores (con su raya de distancia)
+        bounds = [[settings.MAP_CENTER_LAT, settings.MAP_CENTER_LNG]]
+        bounds += [[row.latitude, row.longitude] for row in locations]
+        fmap.fit_bounds(bounds, padding=(45, 45), max_zoom=16)
     folium.LayerControl().add_to(fmap)
     return _render(fmap)
 
@@ -168,6 +234,11 @@ def generate_worker_history_map(
         tooltip=f"{worker_name} - fin",
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(fmap)
+    # llevar la vista hasta la ubicación real del trabajador (no quedarse en la sede)
+    if len(locations) == 1:
+        fmap.setView(points[0], 17)
+    else:
+        fmap.fit_bounds(points, padding=(50, 50), max_zoom=17)
     folium.LayerControl().add_to(fmap)
     return _render(fmap)
 
@@ -195,6 +266,7 @@ def generate_geofence_map(
     for row in locations:
         outside = _is_outside(row, center_lat, center_lng, radius_km)
         color = "red" if outside else "green"
+        _add_distance_ray(fmap, row.latitude, row.longitude, center_lat, center_lng)
         folium.Marker(
             location=[row.latitude, row.longitude],
             popup=folium.Popup(
@@ -207,6 +279,17 @@ def generate_geofence_map(
             tooltip=f"{row.workerName} ({'fuera de zona' if outside else 'dentro'})",
             icon=folium.Icon(color=color, icon="user"),
         ).add_to(fmap)
+    # encuadrar el geofence (círculo) y a todos los trabajadores
+    from math import cos, radians
+
+    dlat = radius_km / 111.0
+    dlng = radius_km / max(1.0, 111.0 * abs(cos(radians(center_lat))))
+    bounds = [
+        [center_lat - dlat, center_lng - dlng],
+        [center_lat + dlat, center_lng + dlng],
+    ]
+    bounds += [[row.latitude, row.longitude] for row in locations]
+    fmap.fit_bounds(bounds, padding=(45, 45), max_zoom=16)
     folium.LayerControl().add_to(fmap)
     return _render(fmap)
 

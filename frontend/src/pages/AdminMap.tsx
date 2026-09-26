@@ -223,7 +223,7 @@ export function AdminMap() {
                 title="Mapa de trabajadores"
                 srcDoc={iframeHtml}
                 className="w-full h-full border-0"
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
               />
             )}
           </div>
