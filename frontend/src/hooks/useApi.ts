@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOpti
 import type {
   Company,
   Branch,
+  Category,
   Product,
   Sale,
   InventoryMovement,
@@ -14,8 +15,8 @@ import type {
   DashboardStats,
   AuditLog
 } from '../types';
-import { authApi, companiesApi, branchesApi, productsApi, salesApi, inventoryApi, targetsApi, vectorsApi, matricesApi, operationsApi, reportsApi, usersApi, auditApi } from '../services/api';
-import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi } from '../services/mockApi';
+import { authApi, companiesApi, branchesApi, productsApi, categoriesApi, salesApi, inventoryApi, targetsApi, vectorsApi, matricesApi, operationsApi, reportsApi, usersApi, auditApi } from '../services/api';
+import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockCategoriesApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi } from '../services/mockApi';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 
@@ -24,6 +25,7 @@ const getApi = () => USE_MOCK ? {
   companies: mockCompaniesApi,
   branches: mockBranchesApi,
   products: mockProductsApi,
+  categories: mockCategoriesApi,
   sales: mockSalesApi,
   inventory: mockInventoryApi,
   targets: mockTargetsApi,
@@ -38,6 +40,7 @@ const getApi = () => USE_MOCK ? {
   companies: companiesApi,
   branches: branchesApi,
   products: productsApi,
+  categories: categoriesApi,
   sales: salesApi,
   inventory: inventoryApi,
   targets: targetsApi,
@@ -191,6 +194,138 @@ export function useOperationResults(companyId: string, options?: UseQueryOptions
 export function useUsers(companyId: string, options?: UseQueryOptions<User[]>) {
   const api = getApi();
   return useQuery({ queryKey: ['users', companyId], queryFn: () => api.users.list(companyId), enabled: !!companyId, ...options });
+}
+
+export function useCreateUser(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<User> & { password: string }) => api.users.create(companyId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users', companyId] }),
+  });
+}
+
+export function useUpdateUser(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<User> & { password?: string } }) => api.users.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users', companyId] }),
+  });
+}
+
+export function useDeleteUser(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.users.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users', companyId] }),
+  });
+}
+
+export type SalePayload = Omit<Partial<Sale>, 'details'> & {
+  details?: Array<{
+    productId?: string;
+    quantity?: number;
+    unitPrice?: number;
+    discount?: number;
+    subtotal?: number;
+  }>;
+};
+
+export function useCreateSale(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SalePayload) => api.sales.create(companyId, data as Partial<Sale>),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sales', companyId] }),
+  });
+}
+
+export function useUpdateSale(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SalePayload }) => api.sales.update(id, data as Partial<Sale>),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sales', companyId] }),
+  });
+}
+
+export function useDeleteSale(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.sales.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sales', companyId] }),
+  });
+}
+
+export function useCreateMovement(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<InventoryMovement>) => api.inventory.createMovement(companyId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inventory', companyId] }),
+  });
+}
+
+export function useCreateTarget(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<Target>) => api.targets.create(companyId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['targets', companyId] }),
+  });
+}
+
+export function useUpdateTarget(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Target> }) => api.targets.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['targets', companyId] }),
+  });
+}
+
+export function useDeleteTarget(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.targets.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['targets', companyId] }),
+  });
+}
+
+export function useCategories(companyId: string) {
+  const api = getApi();
+  return useQuery({ queryKey: ['categories', companyId], queryFn: () => api.categories.list(companyId), enabled: !!companyId });
+}
+
+export function useCreateCategory(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<Category>) => api.categories.create(companyId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories', companyId] }),
+  });
+}
+
+export function useUpdateCategory(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Category> }) => api.categories.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories', companyId] }),
+  });
+}
+
+export function useDeleteCategory(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.categories.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories', companyId] }),
+  });
 }
 
 export function useAuditLogs(companyId: string, params?: { userId?: string; module?: string; startDate?: string; endDate?: string; page?: number; pageSize?: number }, options?: UseQueryOptions<{ data: AuditLog[]; total: number }>) {

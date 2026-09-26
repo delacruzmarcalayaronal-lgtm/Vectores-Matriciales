@@ -17,6 +17,7 @@ import { Tabs, TabPanel } from '../components/ui/Table';
 import {
   type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS
 } from '../lib/theme';
+import { useNotice } from '../hooks/useNotice';
 
 const THEME_CARDS: Record<ThemeMode, { label: string; bg: string; surface: string; text: string; border: string; half?: boolean }> = {
   light: { label: 'Light', bg: '#FFFFFF', surface: '#F1F5F9', text: '#0F172A', border: '#E2E8F0' },
@@ -53,6 +54,7 @@ export function Settings() {
   const [saving, setSaving] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme());
   const [primaryColor, setPrimaryState] = useState<string>(() => getStoredPrimary());
+  const { show, notice } = useNotice();
 
   const handleTheme = (mode: ThemeMode) => {
     setThemeMode(mode);
@@ -316,18 +318,18 @@ export function Settings() {
             <div className="pt-4 border-t border-border">
               <h4 className="font-medium text-text mb-4">Exportar Datos</h4>
               <div className="flex flex-wrap gap-4">
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>Exportar Ventas (CSV)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>Exportar Inventario (CSV)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>Exportar Vectores (JSON)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>Exportar Matrices (JSON)</Button>
-                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>Exportar Historial (CSV)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Ventas (CSV)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Inventario (CSV)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Vectores (JSON)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Matrices (JSON)</Button>
+                <Button variant="outline" leftIcon={<Download className="w-4 h-4" />} onClick={() => show('La exportación de datos estará disponible en una versión futura.')}>Exportar Historial (CSV)</Button>
               </div>
             </div>
             <div className="pt-4 border-t border-border">
               <h4 className="font-medium text-text mb-4">Importar Datos</h4>
               <div className="flex flex-wrap gap-4">
-                <Button variant="outline" leftIcon={<Upload className="w-4 h-4" />}>Importar Productos</Button>
-                <Button variant="outline" leftIcon={<Upload className="w-4 h-4" />}>Importar Ventas</Button>
+                <Button variant="outline" leftIcon={<Upload className="w-4 h-4" />} onClick={() => show('La importación de datos estará disponible en una versión futura.')}>Importar Productos</Button>
+                <Button variant="outline" leftIcon={<Upload className="w-4 h-4" />} onClick={() => show('La importación de datos estará disponible en una versión futura.')}>Importar Ventas</Button>
               </div>
             </div>
           </CardContent>
@@ -354,6 +356,7 @@ export function Settings() {
           </CardContent>
         </Card>
       </TabPanel>
+      {notice}
     </div>
   );
 }

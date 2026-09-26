@@ -1,31 +1,40 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, Tag, DollarSign, Box } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Tag, DollarSign, Box, FolderTree } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
 import { Table, Badge, Modal } from '../components/ui/Table';
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useApi';
+import {
+  useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct,
+  useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory,
+} from '../hooks/useApi';
+import { useAuth } from '../contexts/useAuth';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { Product } from '../types';
-import { productSchema, type ProductForm } from '../schemas';
-
-const mockCategories = [
-  { id: '1', name: 'Computadoras' },
-  { id: '2', name: 'Monitores' },
-  { id: '3', name: 'Accesorios' },
-];
+import type { Product, Category } from '../types';
+import { productSchema, categorySchema, type ProductForm, type CategoryForm } from '../schemas';
 
 export function Products() {
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
+
+  const { user } = useAuth();
+  const canManageCategories = user?.role === 'admin' || user?.role === 'manager';
 
   const { data: products, isLoading, refetch } = useProducts('1');
+  const { data: categories } = useCategories('1');
   const createProduct = useCreateProduct('1');
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
+  const createCategory = useCreateCategory('1');
+  const updateCategory = useUpdateCategory('1');
+  const deleteCategory = useDeleteCategory('1');
 
   const {
     register,
@@ -36,10 +45,55 @@ export function Products() {
     resolver: zodResolver(productSchema) as Resolver<ProductForm>,
   });
 
+  const {
+    register: registerCategory,
+    handleSubmit: handleSubmitCategory,
+    reset: resetCategory,
+    formState: { errors: categoryErrors, isSubmitting: isCategorySubmitting },
+  } = useForm<CategoryForm>({
+    resolver: zodResolver(categorySchema) as Resolver<CategoryForm>,
+  });
+
   const filteredProducts = products?.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.sku.toLowerCase().includes(search.toLowerCase())
   ) || [];
+
+  const openCreateCategoryForm = () => {
+    setEditingCategory(null);
+    resetCategory({ name: '', description: '' });
+    setIsCategoryFormOpen(true);
+  };
+
+  const openEditCategoryForm = (category: Category) => {
+    setEditingCategory(category);
+    resetCategory({ name: category.name, description: category.description || '' });
+    setIsCategoryFormOpen(true);
+  };
+
+  const onSubmitCategory = async (data: CategoryForm) => {
+    try {
+      if (editingCategory) {
+        await updateCategory.mutateAsync({ id: editingCategory.id, data });
+      } else {
+        await createCategory.mutateAsync(data);
+      }
+      setIsCategoryFormOpen(false);
+    } catch (error) {
+      console.error('Error saving category:', error);
+    }
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (deletingCategory) {
+      try {
+        await deleteCategory.mutateAsync(deletingCategory.id);
+        setDeletingCategory(null);
+      } catch (error) {
+        console.error('Error deleting category:', error);
+      }
+    }
+  };
 
   const openCreateModal = () => {
     setEditingProduct(null);
@@ -47,7 +101,7 @@ export function Products() {
       sku: '',
       name: '',
       description: '',
-      categoryId: '1',
+      categoryId: categories?.[0]?.id || '',
       unitPrice: 0,
       costPrice: 0,
       stock: 0,
@@ -114,9 +168,14 @@ export function Products() {
           <h1 className="text-2xl font-bold text-text">Productos</h1>
           <p className="text-secondary mt-1">Catálogo de productos y control de stock</p>
         </div>
-        <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
-          Nuevo Producto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" leftIcon={<FolderTree className="w-4 h-4" />} onClick={() => setIsCategoryModalOpen(true)}>
+            Categorías
+          </Button>
+          <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -140,7 +199,7 @@ export function Products() {
               { key: 'sku', header: 'SKU', render: (row) => <span className="font-mono font-medium">{row.sku}</span> },
               { key: 'name', header: 'Producto' },
               { key: 'categoryId', header: 'Categoría', render: (row) => (
-                <span className="flex items-center gap-1"><Tag className="w-4 h-4" />{mockCategories.find(c => c.id === row.categoryId)?.name || row.categoryId}</span>
+                <span className="flex items-center gap-1"><Tag className="w-4 h-4" />{categories?.find(c => c.id === row.categoryId)?.name || row.categoryId}</span>
               )},
               { key: 'unitPrice', header: 'Precio Venta', render: (row) => (
                 <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" />S/ {row.unitPrice.toLocaleString()}</span>
@@ -202,7 +261,7 @@ export function Products() {
               label="Categoría"
               {...register('categoryId')}
               error={errors.categoryId?.message}
-              options={mockCategories.map(c => ({ value: c.id, label: c.name }))}
+              options={(categories || []).map(c => ({ value: c.id, label: c.name }))}
             />
           </div>
            <Input label="Nombre" {...register('name')} error={errors.name?.message} placeholder='Nombre del producto' />
@@ -247,6 +306,77 @@ export function Products() {
             Cancelar
           </Button>
           <Button variant="danger" onClick={confirmDelete} loading={deleteProduct.isPending}>
+            Eliminar
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        title="Gestión de Categorías"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            {canManageCategories && (
+              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openCreateCategoryForm}>
+                Nueva Categoría
+              </Button>
+            )}
+          </div>
+          <Table
+            data={categories || []}
+            columns={[
+              { key: 'name', header: 'Nombre' },
+              { key: 'description', header: 'Descripción', render: (row) => row.description || '—' },
+              ...(canManageCategories ? [{
+                key: 'actions',
+                header: 'Acciones',
+                render: (row: Category) => (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => openEditCategoryForm(row)} className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Editar"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => setDeletingCategory(row)} className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100" aria-label="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                ),
+              }] : []),
+            ]}
+            keyExtractor={row => row.id}
+            emptyMessage="No hay categorías registradas"
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isCategoryFormOpen}
+        onClose={() => setIsCategoryFormOpen(false)}
+        title={editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+      >
+        <form onSubmit={handleSubmitCategory(onSubmitCategory)} className="space-y-4">
+          <Input label="Nombre" {...registerCategory('name')} error={categoryErrors.name?.message} placeholder="Computadoras" />
+          <Input label="Descripción" {...registerCategory('description')} error={categoryErrors.description?.message} />
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => setIsCategoryFormOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={isCategorySubmitting || createCategory.isPending || updateCategory.isPending}>
+              {editingCategory ? 'Actualizar' : 'Crear'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!deletingCategory}
+        onClose={() => setDeletingCategory(null)}
+        title="Eliminar Categoría"
+        description={`¿Estás seguro de eliminar "${deletingCategory?.name}"? Si tiene productos asociados no podrá eliminarse.`}
+      >
+        <div className="flex justify-end gap-3 pt-4">
+          <Button variant="outline" onClick={() => setDeletingCategory(null)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteCategory} loading={deleteCategory.isPending}>
             Eliminar
           </Button>
         </div>

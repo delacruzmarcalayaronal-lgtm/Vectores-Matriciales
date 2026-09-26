@@ -18,22 +18,40 @@ import {
 import {
   Download,
   Printer,
-  Filter,
-  Calendar
+  Calendar,
+  Plus,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { Input, Select } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
-import { Table, Badge } from '../components/ui/Table';
+import { Table, Badge, Modal } from '../components/ui/Table';
 import {
   useSalesByBranch, useSalesByProduct, useTargetCompliance,
-  useInventoryRotation, useOperationResults, useBranches, useProducts
+  useInventoryRotation, useOperationResults, useBranches, useProducts,
+  useCreateTarget, useUpdateTarget, useDeleteTarget,
 } from '../hooks/useApi';
+import { useAuth } from '../contexts/useAuth';
+import { useNotice } from '../hooks/useNotice';
+import { useForm, type Resolver } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { targetSchema, type TargetForm } from '../schemas';
+import type { Target } from '../types';
 
 const COLORS = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
 export function Reports() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [activeTab, setActiveTab] = useState('overview');
+  const [editingTarget, setEditingTarget] = useState<Target | null>(null);
+  const [deletingTarget, setDeletingTarget] = useState<Target | null>(null);
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
+
+  const { user } = useAuth();
+  const { show, notice } = useNotice();
+  const canManageTargets = user?.role === 'admin' || user?.role === 'manager';
 
   const { data: salesByBranch } = useSalesByBranch('1', { startDate: dateRange.start, endDate: dateRange.end });
   const { data: salesByProduct } = useSalesByProduct('1', { startDate: dateRange.start, endDate: dateRange.end });
@@ -42,6 +60,84 @@ export function Reports() {
   const { data: operationResults } = useOperationResults('1');
   const { data: branches } = useBranches('1');
   const { data: products } = useProducts('1');
+  const createTarget = useCreateTarget('1');
+  const updateTarget = useUpdateTarget('1');
+  const deleteTarget = useDeleteTarget('1');
+  const queryClient = useQueryClient();
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<TargetForm>({
+    resolver: zodResolver(targetSchema) as Resolver<TargetForm>,
+  });
+
+  const refreshTargets = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['targets'] });
+    await queryClient.invalidateQueries({ queryKey: ['reports', 'target-compliance'] });
+  };
+
+  const openCreateTargetModal = () => {
+    setEditingTarget(null);
+    reset({
+      branchId: '',
+      productId: '',
+      period: new Date().toISOString().slice(0, 7),
+      targetValue: 0,
+      achievedValue: 0,
+      type: 'revenue',
+    });
+    setIsTargetModalOpen(true);
+  };
+
+  const openEditTargetModal = (target: Target) => {
+    setEditingTarget(target);
+    reset({
+      branchId: target.branchId || '',
+      productId: target.productId || '',
+      period: target.period,
+      targetValue: target.targetValue,
+      achievedValue: target.achievedValue,
+      type: target.type,
+    });
+    setIsTargetModalOpen(true);
+  };
+
+  const onSubmitTarget = async (data: TargetForm) => {
+    try {
+      const payload = {
+        branchId: data.branchId || undefined,
+        productId: data.productId || undefined,
+        period: data.period,
+        targetValue: data.targetValue,
+        achievedValue: data.achievedValue,
+        type: data.type,
+      };
+      if (editingTarget) {
+        await updateTarget.mutateAsync({ id: editingTarget.id, data: payload });
+      } else {
+        await createTarget.mutateAsync(payload);
+      }
+      setIsTargetModalOpen(false);
+      await refreshTargets();
+    } catch (error) {
+      console.error('Error saving target:', error);
+    }
+  };
+
+  const confirmDeleteTarget = async () => {
+    if (deletingTarget) {
+      try {
+        await deleteTarget.mutateAsync(deletingTarget.id);
+        setDeletingTarget(null);
+        await refreshTargets();
+      } catch (error) {
+        console.error('Error deleting target:', error);
+      }
+    }
+  };
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: <BarChart className="w-4 h-4" /> },
@@ -90,9 +186,16 @@ export function Reports() {
           <p className="text-secondary mt-1">Indicadores ejecutivos y análisis de desempeño</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" leftIcon={<Filter className="w-4 h-4" />}>Filtros</Button>
-          <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>Exportar PDF</Button>
-          <Button variant="outline" leftIcon={<Printer className="w-4 h-4" />}>Imprimir</Button>
+          <Button
+            variant="outline"
+            leftIcon={<Download className="w-4 h-4" />}
+            onClick={() => show('La exportación de reportes estará disponible en una versión futura.')}
+          >
+            Exportar PDF
+          </Button>
+          <Button variant="outline" leftIcon={<Printer className="w-4 h-4" />} onClick={() => window.print()}>
+            Imprimir
+          </Button>
         </div>
       </div>
 
@@ -268,8 +371,13 @@ export function Reports() {
 
       {activeTab === 'targets' && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Cumplimiento de Metas Detallado</CardTitle>
+            {canManageTargets && (
+              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openCreateTargetModal}>
+                Nueva Meta
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <Table
@@ -297,6 +405,16 @@ export function Reports() {
                     </span>
                   </div>
                 )},
+                ...(canManageTargets ? [{
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (row: { target: Target }) => (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openEditTargetModal(row.target)} className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Editar"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => setDeletingTarget(row.target)} className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100" aria-label="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ),
+                }] : []),
               ]}
               keyExtractor={row => row.target.id}
               emptyMessage="Sin metas configuradas"
@@ -355,6 +473,90 @@ export function Reports() {
           </CardContent>
         </Card>
       )}
+
+      <Modal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        title={editingTarget ? 'Editar Meta' : 'Nueva Meta'}
+      >
+        <form onSubmit={handleSubmit(onSubmitTarget)} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Alcance"
+              {...register('branchId')}
+              options={[
+                { value: '', label: 'Toda la empresa' },
+                ...(branches || []).map(b => ({ value: b.id, label: `Sucursal: ${b.name}` })),
+              ]}
+              error={errors.branchId?.message}
+            />
+            <Select
+              label="Producto (opcional)"
+              {...register('productId')}
+              options={[
+                { value: '', label: 'Sin producto específico' },
+                ...(products || []).map(p => ({ value: p.id, label: p.name })),
+              ]}
+              error={errors.productId?.message}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input label="Periodo" placeholder="2026-09" {...register('period')} error={errors.period?.message} />
+            <Select
+              label="Tipo"
+              {...register('type')}
+              options={[
+                { value: 'revenue', label: 'Ingresos (S/)' },
+                { value: 'sales', label: 'Ventas' },
+                { value: 'units', label: 'Unidades' },
+              ]}
+              error={errors.type?.message}
+            />
+            <Input
+              label="Valor objetivo"
+              type="number"
+              min={0}
+              step="0.01"
+              {...register('targetValue', { valueAsNumber: true })}
+              error={errors.targetValue?.message}
+            />
+          </div>
+          <Input
+            label="Valor alcanzado"
+            type="number"
+            min={0}
+            step="0.01"
+            {...register('achievedValue', { valueAsNumber: true })}
+            error={errors.achievedValue?.message}
+          />
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => setIsTargetModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={isSubmitting || createTarget.isPending || updateTarget.isPending}>
+              {editingTarget ? 'Actualizar' : 'Crear'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!deletingTarget}
+        onClose={() => setDeletingTarget(null)}
+        title="Eliminar Meta"
+        description={`¿Estás seguro de eliminar la meta del periodo "${deletingTarget?.period}"? Esta acción no se puede deshacer.`}
+      >
+        <div className="flex justify-end gap-3 pt-4">
+          <Button variant="outline" onClick={() => setDeletingTarget(null)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteTarget} loading={deleteTarget.isPending}>
+            Eliminar
+          </Button>
+        </div>
+      </Modal>
+
+      {notice}
     </div>
   );
 }

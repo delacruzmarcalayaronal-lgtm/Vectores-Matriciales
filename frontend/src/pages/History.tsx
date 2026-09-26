@@ -5,6 +5,7 @@ import { Select } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
 import { Table, Badge } from '../components/ui/Table';
 import { useOperations } from '../hooks/useApi';
+import { useNotice } from '../hooks/useNotice';
 import type { Operation, OperationType } from '../types';
 
 const typeIcons: Record<OperationType, React.ReactNode> = {
@@ -39,6 +40,7 @@ export function History() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
+  const { show, notice } = useNotice();
 
   const { data: operationsData, isLoading } = useOperations('1', {
     page: currentPage,
@@ -71,7 +73,13 @@ export function History() {
           <h1 className="text-2xl font-bold text-text">Historial de Operaciones</h1>
           <p className="text-secondary mt-1">Trazabilidad completa de cálculos ejecutados</p>
         </div>
-        <Button variant="outline" leftIcon={<Filter className="w-4 h-4" />}>Exportar</Button>
+        <Button
+          variant="outline"
+          leftIcon={<Filter className="w-4 h-4" />}
+          onClick={() => show('La exportación de historial estará disponible en una versión futura.')}
+        >
+          Exportar
+        </Button>
       </div>
 
       <Card>
@@ -158,6 +166,7 @@ export function History() {
           )}
         </CardContent>
       </Card>
+      {notice}
     </div>
   );
 }

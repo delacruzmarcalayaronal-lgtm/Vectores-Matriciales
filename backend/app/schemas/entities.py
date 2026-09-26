@@ -80,6 +80,11 @@ class CategoryOut(BaseModel):
     updatedAt: str
 
 
+class CategoryUpsert(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
 class ProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

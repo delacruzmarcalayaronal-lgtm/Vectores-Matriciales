@@ -4,6 +4,7 @@ import type {
   ApiError,
   Company,
   Branch,
+  Category,
   Product,
   Sale,
   InventoryMovement,
@@ -166,6 +167,15 @@ export const productsApi = {
     unwrap(api.post<Product>(`/companies/${companyId}/products`, data)),
   update: (id: string, data: Partial<Product>) => unwrap(api.put<Product>(`/products/${id}`, data)),
   delete: (id: string) => unwrap(api.delete<void>(`/products/${id}`)),
+};
+
+export const categoriesApi = {
+  list: (companyId: string) => unwrap(api.get<Category[]>(`/companies/${companyId}/categories`)),
+  get: (id: string) => unwrap(api.get<Category>(`/categories/${id}`)),
+  create: (companyId: string, data: Partial<Category>) =>
+    unwrap(api.post<Category>(`/companies/${companyId}/categories`, data)),
+  update: (id: string, data: Partial<Category>) => unwrap(api.put<Category>(`/categories/${id}`, data)),
+  delete: (id: string) => unwrap(api.delete<void>(`/categories/${id}`)),
 };
 
 export const salesApi = {

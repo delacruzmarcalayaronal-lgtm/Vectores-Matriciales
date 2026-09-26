@@ -2,6 +2,7 @@ import type {
   User,
   Company,
   Branch,
+  Category,
   Product,
   Sale,
   InventoryMovement,
@@ -224,15 +225,106 @@ export const mockProductsApi = {
 export const mockSalesApi = {
   list: async (_companyId: string) => { await delay(MOCK_DELAY); return { data: mockSales, total: mockSales.length }; },
   get: async (id: string) => { await delay(MOCK_DELAY); return mockSales.find(s => s.id === id)!; },
+  create: async (companyId: string, data: Partial<Sale>) => {
+    await delay(MOCK_DELAY);
+    const sale: Sale = {
+      id: String(Date.now()), companyId, branchId: data.branchId || 'br1',
+      saleNumber: `V-${String(mockSales.length + 1).padStart(4, '0')}`,
+      date: new Date().toISOString(), subtotal: data.subtotal || 0, tax: data.tax || 0,
+      total: data.total || 0, status: data.status || 'confirmed', userId: '1',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      ...(data as object),
+    } as Sale;
+    mockSales.push(sale);
+    return sale;
+  },
+  update: async (id: string, data: Partial<Sale>) => {
+    await delay(MOCK_DELAY);
+    const index = mockSales.findIndex(s => s.id === id);
+    const updated = { ...mockSales[index], ...data, updatedAt: new Date().toISOString() } as Sale;
+    mockSales[index] = updated;
+    return updated;
+  },
+  delete: async (id: string) => {
+    await delay(MOCK_DELAY);
+    const index = mockSales.findIndex(s => s.id === id);
+    if (index >= 0) mockSales.splice(index, 1);
+  },
 };
 
 export const mockInventoryApi = {
   list: async (_companyId: string) => { await delay(MOCK_DELAY); return mockInventoryMovements; },
   getStock: async (_companyId: string, _branchId: string) => { await delay(MOCK_DELAY); return {} as Record<string, number>; },
+  createMovement: async (companyId: string, data: Partial<InventoryMovement>) => {
+    await delay(MOCK_DELAY);
+    const movement: InventoryMovement = {
+      id: String(Date.now()), companyId, branchId: data.branchId || 'br1',
+      productId: data.productId || 'p1', type: data.type || 'in',
+      quantity: data.quantity || 1, reference: data.reference || '',
+      date: new Date().toISOString(), notes: data.notes || '',
+      createdAt: new Date().toISOString(), ...(data as object),
+    } as InventoryMovement;
+    mockInventoryMovements.push(movement);
+    return movement;
+  },
 };
 
 export const mockTargetsApi = {
   list: async (_companyId: string) => { await delay(MOCK_DELAY); return mockTargets; },
+  get: async (id: string) => { await delay(MOCK_DELAY); return mockTargets.find(t => t.id === id)!; },
+  create: async (companyId: string, data: Partial<Target>) => {
+    await delay(MOCK_DELAY);
+    const target: Target = {
+      id: String(Date.now()), companyId, branchId: data.branchId || 'br1',
+      productId: data.productId || 'p1', period: data.period || '2026-09',
+      targetValue: data.targetValue || 0, achievedValue: data.achievedValue || 0,
+      type: data.type || 'revenue', createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(), ...(data as object),
+    } as Target;
+    mockTargets.push(target);
+    return target;
+  },
+  update: async (id: string, data: Partial<Target>) => {
+    await delay(MOCK_DELAY);
+    const index = mockTargets.findIndex(t => t.id === id);
+    const updated = { ...mockTargets[index], ...data, updatedAt: new Date().toISOString() } as Target;
+    mockTargets[index] = updated;
+    return updated;
+  },
+  delete: async (id: string) => {
+    await delay(MOCK_DELAY);
+    const index = mockTargets.findIndex(t => t.id === id);
+    if (index >= 0) mockTargets.splice(index, 1);
+  },
+};
+
+export const mockCategories: Category[] = [];
+
+export const mockCategoriesApi = {
+  list: async (_companyId: string) => { await delay(MOCK_DELAY); return mockCategories; },
+  get: async (id: string) => { await delay(MOCK_DELAY); return mockCategories.find(c => c.id === id)!; },
+  create: async (companyId: string, data: Partial<Category>) => {
+    await delay(MOCK_DELAY);
+    const category: Category = {
+      id: String(Date.now()), companyId, name: data.name || 'Nueva categoría',
+      description: data.description || '', createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    mockCategories.push(category);
+    return category;
+  },
+  update: async (id: string, data: Partial<Category>) => {
+    await delay(MOCK_DELAY);
+    const index = mockCategories.findIndex(c => c.id === id);
+    const updated = { ...mockCategories[index], ...data, updatedAt: new Date().toISOString() } as Category;
+    mockCategories[index] = updated;
+    return updated;
+  },
+  delete: async (id: string) => {
+    await delay(MOCK_DELAY);
+    const index = mockCategories.findIndex(c => c.id === id);
+    if (index >= 0) mockCategories.splice(index, 1);
+  },
 };
 
 export const mockVectorsApi = {
@@ -340,6 +432,22 @@ export const mockUsersApi = {
     }));
     return registeredUsers;
   },
+  get: async (id: string) => { await delay(MOCK_DELAY); return { ...mockUser, id, dni: id }; },
+  create: async (companyId: string, data: Partial<User> & { password?: string }) => {
+    await delay(MOCK_DELAY);
+    const user: User = {
+      ...mockUser, id: String(Date.now()), companyId, name: data.name || 'Nuevo Usuario',
+      email: data.email || `${data.dni}@matrixflow.local`, dni: data.dni || '',
+      role: (data.role as Role) || 'operator', createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return user;
+  },
+  update: async (id: string, data: Partial<User>) => {
+    await delay(MOCK_DELAY);
+    return { ...mockUser, id, ...data } as User;
+  },
+  delete: async (_id: string) => { await delay(MOCK_DELAY); },
 };
 
 export const mockAuditApi = {

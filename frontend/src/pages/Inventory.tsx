@@ -1,18 +1,50 @@
 import { useState } from 'react';
-import { Plus, Search, Eye, Edit, Trash2, Box, ArrowUp, ArrowDown, Minus, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Eye, Box, ArrowUp, ArrowDown, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { Select } from '../components/ui/Input';
+import { Input, Select } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
-import { Table, Badge } from '../components/ui/Table';
-import { useInventoryMovements } from '../hooks/useApi';
+import { Table, Badge, Modal } from '../components/ui/Table';
+import { useInventoryMovements, useBranches, useProducts, useCreateMovement } from '../hooks/useApi';
+import { useForm, type Resolver } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { InventoryMovement } from '../types';
+import { movementSchema, type MovementForm } from '../schemas';
+
+const TYPE_LABELS: Record<string, string> = {
+  in: 'Entrada',
+  out: 'Salida',
+  adjustment: 'Ajuste',
+  transfer: 'Transferencia',
+};
+
+const TYPE_VARIANTS: Record<string, 'success' | 'danger' | 'warning' | 'info'> = {
+  in: 'success',
+  out: 'danger',
+  adjustment: 'warning',
+  transfer: 'info',
+};
 
 export function Inventory() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewingMovement, setViewingMovement] = useState<InventoryMovement | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const pageSize = 10;
 
-  const { data: movements, isLoading } = useInventoryMovements('1');
+  const { data: movements, isLoading, refetch } = useInventoryMovements('1');
+  const { data: branches } = useBranches('1');
+  const { data: products } = useProducts('1');
+  const createMovement = useCreateMovement('1');
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<MovementForm>({
+    resolver: zodResolver(movementSchema) as Resolver<MovementForm>,
+  });
 
   const filteredMovements = (movements || []).filter(m =>
     (m.product?.name || m.productId).toLowerCase().includes(search.toLowerCase()) &&
@@ -25,6 +57,34 @@ export function Inventory() {
   );
   const totalPages = Math.ceil(filteredMovements.length / pageSize);
 
+  const openCreateModal = () => {
+    reset({
+      branchId: branches?.[0]?.id || '',
+      productId: '',
+      type: 'in',
+      quantity: 1,
+      reference: '',
+      notes: '',
+      date: new Date().toISOString(),
+    });
+    setIsModalOpen(true);
+  };
+
+  const onSubmit = async (data: MovementForm) => {
+    try {
+      await createMovement.mutateAsync({
+        ...data,
+        reference: data.reference || undefined,
+        notes: data.notes || undefined,
+        date: data.date || new Date().toISOString(),
+      });
+      setIsModalOpen(false);
+      refetch();
+    } catch (error) {
+      console.error('Error creating movement:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -32,10 +92,7 @@ export function Inventory() {
           <h1 className="text-2xl font-bold text-text">Inventario</h1>
           <p className="text-secondary mt-1">Control de existencias y movimientos de stock</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" leftIcon={<Filter className="w-4 h-4" />}>Filtros</Button>
-          <Button leftIcon={<Plus className="w-4 h-4" />}>Nuevo Movimiento</Button>
-        </div>
+        <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>Nuevo Movimiento</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -111,12 +168,8 @@ export function Inventory() {
               { key: 'product', header: 'Producto', render: (row) => row.product?.name || row.productId },
               { key: 'branch', header: 'Sucursal', render: (row) => row.branch?.name || row.branchId },
               { key: 'type', header: 'Tipo', render: (row) => (
-                <Badge variant={
-                  row.type === 'in' ? 'success' :
-                  row.type === 'out' ? 'danger' :
-                  row.type === 'adjustment' ? 'warning' : 'info'
-                }>
-                  {row.type === 'in' ? 'Entrada' : row.type === 'out' ? 'Salida' : row.type === 'adjustment' ? 'Ajuste' : 'Transferencia'}
+                <Badge variant={TYPE_VARIANTS[row.type]}>
+                  {TYPE_LABELS[row.type]}
                 </Badge>
               )},
               { key: 'quantity', header: 'Cantidad', render: (row) => (
@@ -126,11 +179,9 @@ export function Inventory() {
               )},
               { key: 'reference', header: 'Referencia', render: (row) => row.reference },
               { key: 'notes', header: 'Notas', render: (row) => row.notes || '-' },
-              { key: 'actions', header: 'Acciones', render: (_row) => (
+              { key: 'actions', header: 'Acciones', render: (row) => (
                 <div className="flex items-center gap-1">
-                  <button className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Ver"><Eye className="w-4 h-4" /></button>
-                  <button className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Editar"><Edit className="w-4 h-4" /></button>
-                  <button className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100" aria-label="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => setViewingMovement(row)} className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Ver"><Eye className="w-4 h-4" /></button>
                 </div>
               )},
             ]}
@@ -157,6 +208,108 @@ export function Inventory() {
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Nuevo Movimiento"
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Sucursal"
+              {...register('branchId')}
+              options={[
+                { value: '', label: 'Seleccione una sucursal' },
+                ...(branches || []).map(b => ({ value: b.id, label: b.name })),
+              ]}
+              error={errors.branchId?.message}
+            />
+            <Select
+              label="Tipo de movimiento"
+              {...register('type')}
+              options={[
+                { value: 'in', label: 'Entrada' },
+                { value: 'out', label: 'Salida' },
+                { value: 'adjustment', label: 'Ajuste' },
+                { value: 'transfer', label: 'Transferencia' },
+              ]}
+              error={errors.type?.message}
+            />
+          </div>
+          <Select
+            label="Producto"
+            {...register('productId')}
+            options={[
+              { value: '', label: 'Seleccione un producto' },
+              ...(products || []).map(p => ({ value: p.id, label: `${p.name} (${p.sku})` })),
+            ]}
+            error={errors.productId?.message}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Cantidad"
+              type="number"
+              min={1}
+              {...register('quantity', { valueAsNumber: true })}
+              error={errors.quantity?.message}
+            />
+            <Input label="Referencia" {...register('reference')} placeholder="OC-001, GR-042..." />
+          </div>
+          <Input label="Notas" {...register('notes')} />
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={isSubmitting || createMovement.isPending}>
+              Registrar
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!viewingMovement}
+        onClose={() => setViewingMovement(null)}
+        title="Detalle del Movimiento"
+      >
+        {viewingMovement && (
+          <div className="space-y-4">
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <dt className="text-secondary">Fecha</dt>
+                <dd className="text-text">{new Date(viewingMovement.date).toLocaleString('es-PE')}</dd>
+              </div>
+              <div>
+                <dt className="text-secondary">Tipo</dt>
+                <dd><Badge variant={TYPE_VARIANTS[viewingMovement.type]}>{TYPE_LABELS[viewingMovement.type]}</Badge></dd>
+              </div>
+              <div>
+                <dt className="text-secondary">Producto</dt>
+                <dd className="text-text">{viewingMovement.product?.name || viewingMovement.productId}</dd>
+              </div>
+              <div>
+                <dt className="text-secondary">Sucursal</dt>
+                <dd className="text-text">{viewingMovement.branch?.name || viewingMovement.branchId}</dd>
+              </div>
+              <div>
+                <dt className="text-secondary">Cantidad</dt>
+                <dd className="font-mono font-semibold text-text">{viewingMovement.quantity}</dd>
+              </div>
+              <div>
+                <dt className="text-secondary">Referencia</dt>
+                <dd className="text-text">{viewingMovement.reference || '—'}</dd>
+              </div>
+            </dl>
+            {viewingMovement.notes && (
+              <p className="text-sm text-secondary"><span className="font-medium text-text">Notas:</span> {viewingMovement.notes}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button variant="outline" onClick={() => setViewingMovement(null)}>Cerrar</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
