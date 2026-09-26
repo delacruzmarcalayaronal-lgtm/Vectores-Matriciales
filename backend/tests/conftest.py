@@ -20,7 +20,7 @@ def _fresh_db() -> None:
 
 def _dispose_engine() -> None:
     try:
-        from app.db import engine
+        from app.core.database import engine
 
         engine.dispose()
     except Exception:

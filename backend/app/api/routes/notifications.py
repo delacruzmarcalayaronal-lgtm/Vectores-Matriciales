@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, get_current_user
-from ...db import get_db
+from ...core.database import get_db
 from ...models import User
 from ...repositories.notification_repository import NotificationRepository
 from ...schemas import NotificationOut, NotificationUpsert

@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   Home,
@@ -10,15 +10,11 @@ import {
   FileText,
   Users,
   Settings,
-  Menu,
-  ArrowLeft,
   ScanFace,
   Map,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
-import { NotificationBell } from '../notifications/NotificationBell';
-import { OnlineStatus } from './OnlineStatus';
 import { useAuth } from '../../contexts/useAuth';
 import { type ModuleKey } from '../../lib/permissions';
 
@@ -114,8 +110,8 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
       title={expanded ? undefined : item.label}
       className={() => clsx(
         'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-        'text-secondary hover:text-white hover:bg-white/10',
-        isActive(item.href) && 'text-white bg-primary/20'
+        'text-white/80 hover:text-white hover:bg-white/10',
+        isActive(item.href) && 'text-white bg-white/20'
       )}
     >
       <span className="flex-shrink-0">{item.icon}</span>
@@ -149,7 +145,7 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
           className="flex items-center gap-2 min-w-0"
           aria-label="MatrixFlow Home"
         >
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
             <Calculator className="w-5 h-5 text-white" />
           </div>
           {expanded && <span className="font-bold text-white text-lg truncate">MatrixFlow</span>}
@@ -171,61 +167,3 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
   );
 }
 
-export function Header({
-  onMenuClick,
-  hasSidebar,
-  sidebarExpanded = false,
-}: {
-  onMenuClick: () => void;
-  hasSidebar: boolean;
-  sidebarExpanded?: boolean;
-}) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const showBack = !hasSidebar && location.pathname !== '/dashboard';
-
-  return (
-    <header
-      className={clsx(
-        'h-16 border-b border-border fixed top-0 left-0 right-0 z-30 flex items-center px-4 sm:px-6 transition-[padding] duration-300 print:hidden',
-        hasSidebar && (sidebarExpanded ? 'lg:pl-72' : 'lg:pl-24')
-      )}
-      style={{ backgroundColor: 'var(--color-primary)' }}
-    >
-      {hasSidebar && (
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-lg text-white/90 hover:text-white hover:bg-white/20 mr-2"
-          aria-label="Abrir menú"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-      )}
-      {showBack && (
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 mr-2 rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors"
-          aria-label="Retroceder"
-          title="Retroceder"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-      )}
-
-      <div className="flex-1 flex items-center justify-between min-w-0">
-        <h1 className="text-base sm:text-xl font-semibold text-white truncate">MatrixFlow Enterprise</h1>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <NotificationBell />
-          <OnlineStatus className="hidden sm:flex" />
-          {!hasSidebar && (
-            <ProfileAvatar
-              size="sm"
-              ringClassName="ring-2 ring-primary/20"
-              dotBorderClassName="border-white"
-            />
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from .entities import BranchOut, InventoryMovementOut, ProductOut, SaleOut, TargetOut
+from .branch import BranchOut
+from .inventory import InventoryMovementOut
+from .product import ProductOut
+from .sale import SaleOut
+from .target import TargetOut
 
 
 class TopSellingProductOut(BaseModel):

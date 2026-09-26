@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, get_current_user, require_roles
-from ...db import get_db
+from ...core.database import get_db
 from ...models import Matrix, User
 from ...schemas import MatrixOut, MatrixUpsert
 from ...services.audit import record_audit

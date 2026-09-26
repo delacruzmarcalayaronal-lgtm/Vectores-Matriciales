@@ -18,7 +18,9 @@ import type {
   NotificationInput,
 } from '../types';
 import { authApi, companiesApi, branchesApi, productsApi, categoriesApi, salesApi, inventoryApi, targetsApi, vectorsApi, matricesApi, operationsApi, reportsApi, usersApi, auditApi, notificationsApi } from '../services/api';
-import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockCategoriesApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi, mockNotificationsApi } from '../services/mockApi';
+import { locationsApi } from '../services/locationApi';
+import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockCategoriesApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi, mockNotificationsApi, mockLocationsApi } from '../services/mockApi';
+import type { LocationInput, LocationRecord, WorkerLastLocation, WorkerItem } from '../services/locationApi';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 
@@ -38,6 +40,7 @@ const getApi = () => USE_MOCK ? {
   users: mockUsersApi,
   audit: mockAuditApi,
   notifications: mockNotificationsApi,
+  locations: mockLocationsApi,
 } : {
   auth: authApi,
   companies: companiesApi,
@@ -54,6 +57,7 @@ const getApi = () => USE_MOCK ? {
   users: usersApi,
   audit: auditApi,
   notifications: notificationsApi,
+  locations: locationsApi,
 };
 
 export const useAuth = () => {
@@ -564,5 +568,72 @@ export function useNotificationSync(companyId: string) {
       return created;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', companyId] }),
+  });
+}
+
+const LOCATION_POLL_MS = 60000;
+
+export function useLatestLocations(options?: UseQueryOptions<WorkerLastLocation[]>) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['locations', 'latest'],
+    queryFn: () => api.locations.getLatestLocations(),
+    refetchInterval: LOCATION_POLL_MS,
+    ...options,
+  });
+}
+
+export function useMapHtml(options?: { enabled?: boolean }) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['locations', 'map'],
+    queryFn: () => api.locations.getMapHtml(),
+    refetchInterval: LOCATION_POLL_MS,
+    ...options,
+  });
+}
+
+export function useWorkerHistoryMap(workerId: string | null) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['locations', 'map', 'history', workerId],
+    queryFn: () => api.locations.getWorkerHistoryMap(workerId as string),
+    enabled: Boolean(workerId),
+  });
+}
+
+export function useWorkerHistory(workerId: string | null) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['locations', 'history', workerId],
+    queryFn: () => api.locations.getWorkerHistory(workerId as string),
+    enabled: Boolean(workerId),
+  });
+}
+
+export function useWorkersList(options?: UseQueryOptions<WorkerItem[]>) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['locations', 'workers'],
+    queryFn: () => api.locations.listWorkers(),
+    ...options,
+  });
+}
+
+export function useOutsideGeofence(lat: number, lng: number, radiusKm: number, enabled = true) {
+  const api = getApi();
+  return useQuery({
+    queryKey: ['locations', 'outside', lat, lng, radiusKm],
+    queryFn: () => api.locations.getWorkersOutsideGeofence(lat, lng, radiusKm),
+    enabled,
+  });
+}
+
+export function useSendLocation() {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: LocationInput): Promise<LocationRecord> => api.locations.sendLocation(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['locations'] }),
   });
 }

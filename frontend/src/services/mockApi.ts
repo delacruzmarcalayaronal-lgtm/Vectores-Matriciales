@@ -16,6 +16,13 @@
   AppNotification,
   NotificationInput,
 } from '../types';
+import type {
+  LocationRecord,
+  WorkerLastLocation,
+  WorkerItem,
+  ConsentRecord,
+  TrackingStatus,
+} from './locationApi';
 
 const MOCK_DELAY = 300;
 
@@ -558,3 +565,58 @@ export const mockNotificationsApi = {
     return { message: 'Notificaciones descartadas', count };
   },
 };
+
+const MOCK_WORKERS = [
+  { id: 'w1', userId: '3', employeeCode: '44444444', name: 'Operario de Caja', position: 'Cajero', department: 'Ventas', isActive: true, trackingEnabled: true },
+  { id: 'w2', userId: '4', employeeCode: '22222222', name: 'Gerente de Operaciones', position: 'Gerente', department: 'Operaciones', isActive: true, trackingEnabled: true },
+];
+
+const MOCK_LOCATIONS = [
+  { id: 'l1', workerId: 'w1', latitude: -12.0464, longitude: -77.0428, accuracy: 8, isWithinGeofence: true, recordedAt: new Date(Date.now() - 60000).toISOString() },
+  { id: 'l2', workerId: 'w2', latitude: -12.0600, longitude: -77.0300, accuracy: 15, isWithinGeofence: false, recordedAt: new Date(Date.now() - 25 * 60000).toISOString() },
+];
+
+const MOCK_STATUSES: TrackingStatus[] = ['active', 'idle'];
+
+export const mockLocationsApi = {
+  sendLocation: async (data: { latitude: number; longitude: number }): Promise<LocationRecord> => {
+    await delay(MOCK_DELAY);
+    return { id: `l${Date.now()}`, workerId: 'w1', latitude: data.latitude, longitude: data.longitude, accuracy: 10, isWithinGeofence: true, recordedAt: new Date().toISOString() };
+  },
+  getLatestLocations: async (): Promise<WorkerLastLocation[]> => {
+    await delay(MOCK_DELAY);
+    return MOCK_LOCATIONS.map((loc, i) => ({
+      workerId: loc.workerId,
+      workerName: MOCK_WORKERS[i]?.name ?? 'Trabajador',
+      employeeCode: MOCK_WORKERS[i]?.employeeCode ?? '00000000',
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      accuracy: loc.accuracy,
+      lastSeen: loc.recordedAt,
+      minutesAgo: Math.round((Date.now() - new Date(loc.recordedAt).getTime()) / 60000),
+      status: MOCK_STATUSES[i] ?? 'offline',
+    }));
+  },
+  getWorkerHistory: async (workerId: string): Promise<LocationRecord[]> => { await delay(MOCK_DELAY); return MOCK_LOCATIONS.filter(l => l.workerId === workerId); },
+  getMapHtml: async (): Promise<string> => { await delay(MOCK_DELAY); return '<html><body style="margin:0;display:flex;height:95vh;align-items:center;justify-content:center;font-family:sans-serif;color:#64748b">Mapa (modo demo — conecta el backend para ver Folium)</body></html>'; },
+  getWorkerHistoryMap: async (): Promise<string> => { await delay(MOCK_DELAY); return '<html><body style="margin:0;display:flex;height:95vh;align-items:center;justify-content:center;font-family:sans-serif;color:#64748b">Historial (modo demo)</body></html>'; },
+  getGeofenceMapHtml: async (): Promise<string> => { await delay(MOCK_DELAY); return '<html><body style="margin:0;display:flex;height:95vh;align-items:center;justify-content:center;font-family:sans-serif;color:#64748b">Geofence (modo demo)</body></html>'; },
+  getWorkersOutsideGeofence: async (): Promise<WorkerLastLocation[]> => { await delay(MOCK_DELAY); return [mockLatestOutside()]; },
+  sendConsent: async (consentStatus: 'accepted' | 'denied'): Promise<ConsentRecord> => {
+    await delay(MOCK_DELAY);
+    return { id: `c${Date.now()}`, workerId: 'w1', consentStatus, consentedAt: new Date().toISOString() };
+  },
+  listWorkers: async (): Promise<WorkerItem[]> => { await delay(MOCK_DELAY); return MOCK_WORKERS; },
+};
+
+const mockLatestOutside = () => ({
+  workerId: 'w2',
+  workerName: 'Gerente de Operaciones',
+  employeeCode: '22222222',
+  latitude: -12.0600,
+  longitude: -77.0300,
+  accuracy: 15,
+  lastSeen: MOCK_LOCATIONS[1].recordedAt,
+  minutesAgo: 25,
+  status: 'idle' as const,
+});

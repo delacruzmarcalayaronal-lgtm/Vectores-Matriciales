@@ -5,7 +5,7 @@ from time import perf_counter
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from ..algorithms.operations import run_operation
+from ..algorithms import run_operation
 from ..models import Matrix, Operation, User, Vector
 from ..api.helpers import get_or_404, new_id
 from ..repositories.operation_repository import OperationRepository

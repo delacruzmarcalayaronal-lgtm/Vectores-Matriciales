@@ -22,6 +22,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # Mapa y rastreo de trabajadores
+    MAP_CENTER_LAT: float = -12.0464
+    MAP_CENTER_LNG: float = -77.0428
+    MAP_ZOOM: int = 12
+    LOCATION_INTERVAL_SECONDS: int = 60
+    GEOFENCE_DEFAULT_RADIUS_KM: float = 0.5
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def _parse_origins(cls, value: object) -> object:

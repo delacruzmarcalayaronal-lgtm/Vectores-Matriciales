@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, get_current_user, require_roles
-from ...db import get_db
+from ...core.database import get_db
 from ...models import User
 from ...schemas import OperationExecuteIn, OperationOut, Page
 from ...services.audit import record_audit
-from ...services.operations import OperationService
+from ...services.operation_service import OperationService
 from ..helpers import get_or_404
 from ...models import Operation
 

@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeAuth } from './services/api';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/useAuth';
 import { Layout } from './components/layout/Layout';
+import { LocationConsentModal } from './components/LocationConsentModal';
 import { resolveModule, firstAllowedPath } from './lib/permissions';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -64,9 +66,34 @@ const ModuleGuard = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+function LocationConsentGate() {
+  const { user } = useAuth();
+  const [decided, setDecided] = useState(() => Boolean(localStorage.getItem('locationConsent')));
+
+  useEffect(() => {
+    const onChange = () => setDecided(Boolean(localStorage.getItem('locationConsent')));
+    window.addEventListener('location-consent-changed', onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener('location-consent-changed', onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
+
+  return (
+    <LocationConsentModal
+      isOpen={Boolean(user) && !decided}
+      onAccept={() => setDecided(true)}
+      onDeny={() => setDecided(true)}
+    />
+  );
+}
+
 function AppRoutes() {
   return (
-    <Routes>
+    <>
+      <LocationConsentGate />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
@@ -90,7 +117,8 @@ function AppRoutes() {
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

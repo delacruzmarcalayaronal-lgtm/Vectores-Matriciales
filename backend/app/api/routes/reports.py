@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, get_current_user
-from ...db import get_db
+from ...core.database import get_db
 from ...models import Branch, InventoryMovement, Operation, Product, Sale, Target, User
 from ...schemas import (
     BranchOut,

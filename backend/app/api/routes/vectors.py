@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, require_roles
-from ...db import get_db
+from ...core.database import get_db
 from ...models import User, Vector
 from ...schemas import VectorOut, VectorUpsert
 from ...services.audit import record_audit
-from ..helpers import apply_changes, get_or_404, new_id
+from ...services.vector_service import create_vector as create_vector_record
+from ...services.vector_service import update_vector as update_vector_record
+from ..helpers import get_or_404
 
 router = APIRouter(tags=["vectors"])
 
@@ -38,30 +40,7 @@ def create_vector(
     db: Session = Depends(get_db),
 ) -> VectorOut:
     ensure_company(user, company_id)
-    changes = body.model_dump(exclude_unset=True)
-    if not changes.get("name"):
-        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
-    values = [float(x) for x in (changes.get("values") or [])]
-    if not values:
-        raise HTTPException(status_code=400, detail="El vector debe contener al menos un valor")
-    vector = Vector(
-        id=new_id(),
-        companyId=company_id,
-        name=changes.pop("name"),
-        description=changes.pop("description", "") or "",
-        values=values,
-        dimension=len(values),
-        source=changes.pop("source", "manual") or "manual",
-        sourceConfig=changes.pop("sourceConfig", None),
-    )
-    db.add(vector)
-    record_audit(
-        db, user, action="create", module="vectores",
-        entity_type="vector", entity_id=vector.id,
-        new_values={"name": vector.name, "dimension": vector.dimension}, request=request,
-    )
-    db.commit()
-    db.refresh(vector)
+    vector = create_vector_record(db, company_id, body, user, request)
     return VectorOut.model_validate(vector)
 
 
@@ -86,20 +65,7 @@ def update_vector(
 ) -> VectorOut:
     vector = get_or_404(db, Vector, vector_id, "Vector")
     ensure_company(user, vector.companyId)
-    changes = body.model_dump(exclude_unset=True)
-    if "values" in changes:
-        values = [float(x) for x in (changes["values"] or [])]
-        if not values:
-            raise HTTPException(status_code=400, detail="El vector debe contener al menos un valor")
-        changes["values"] = values
-        changes["dimension"] = len(values)
-    apply_changes(vector, changes)
-    record_audit(
-        db, user, action="update", module="vectores",
-        entity_type="vector", entity_id=vector.id, new_values=changes, request=request,
-    )
-    db.commit()
-    db.refresh(vector)
+    vector = update_vector_record(db, vector, body, user, request)
     return VectorOut.model_validate(vector)
 
 

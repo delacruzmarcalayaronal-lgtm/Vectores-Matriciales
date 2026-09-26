@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, require_roles
-from ...db import get_db
+from ...core.database import get_db
 from ...models import Branch, InventoryMovement, Product, Sale, SaleDetail, User, utcnow
 from ...schemas import Page, SaleOut, SaleUpsert
 from ...services.audit import record_audit

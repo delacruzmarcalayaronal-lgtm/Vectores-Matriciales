@@ -17,6 +17,7 @@ from .api.routes import (
     categories,
     companies,
     inventory,
+    locations,
     matrices,
     notifications,
     operations,
@@ -26,9 +27,10 @@ from .api.routes import (
     targets,
     users,
     vectors,
+    workers,
 )
 from .core.config import settings
-from .db import init_db
+from .core.database import init_db
 
 STATUS_CODES = {
     400: "bad_request",
@@ -131,6 +133,8 @@ for route_module in (
     audit,
     reports,
     notifications,
+    workers,
+    locations,
 ):
     api_router.include_router(route_module.router)
 
@@ -146,7 +150,7 @@ def root() -> dict:
 def health() -> dict:
     from sqlalchemy import text
 
-    from .db import SessionLocal
+    from .core.database import SessionLocal
 
     db = SessionLocal()
     try:

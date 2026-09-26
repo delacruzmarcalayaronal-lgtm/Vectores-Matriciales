@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, get_current_user, require_roles
 from ...core.security import hash_password
-from ...db import get_db
+from ...core.database import get_db
 from ...models import User
 from ...schemas import UserCreate, UserOut, UserUpdate
 from ...services.audit import record_audit

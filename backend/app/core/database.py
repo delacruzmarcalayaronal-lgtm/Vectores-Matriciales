@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from .core.config import settings
+from .config import settings
 
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
@@ -30,7 +30,7 @@ def _run_migrations() -> None:
     from alembic import command
     from alembic.config import Config
 
-    backend_dir = Path(__file__).resolve().parents[1]
+    backend_dir = Path(__file__).resolve().parents[2]
     cfg = Config(str(backend_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend_dir / "migrations"))
     cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
@@ -38,8 +38,8 @@ def _run_migrations() -> None:
 
 
 def init_db() -> None:
-    from . import models  # noqa: F401
-    from .seed import seed_if_empty
+    from .. import models  # noqa: F401
+    from ..seed import seed_if_empty
 
     _run_migrations()
     db = SessionLocal()

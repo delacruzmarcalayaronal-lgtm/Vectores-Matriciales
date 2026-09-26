@@ -1,17 +1,37 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { clsx } from 'clsx';
-import { Sidebar, Header } from './Sidebar';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
 import { SmokeField } from '../auth/SmokeField';
 import { readBgMotion, BG_MOTION_EVENT } from '../../lib/bgMotion';
 import { useAuth } from '../../contexts/useAuth';
+import { LocationStatusBanner } from '../LocationStatusBanner';
+import { useLocationTracking } from '../../hooks/useLocationTracking';
+
+const readConsent = (): 'accepted' | 'denied' | null => {
+  const value = localStorage.getItem('locationConsent');
+  return value === 'accepted' || value === 'denied' ? value : null;
+};
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [bgMotion, setBgMotion] = useState(readBgMotion);
+  const [consent, setConsent] = useState<'accepted' | 'denied' | null>(readConsent);
   const { user } = useAuth();
   const hasSidebar = user?.role === 'admin';
+  const { isTracking, permission } = useLocationTracking(consent === 'accepted');
+
+  useEffect(() => {
+    const onChange = () => setConsent(readConsent());
+    window.addEventListener('location-consent-changed', onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener('location-consent-changed', onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
 
   useEffect(() => {
     const onChange = () => setBgMotion(readBgMotion());
@@ -52,6 +72,7 @@ export function Layout() {
       />
 
       <main className={clsx('relative pt-16 transition-all duration-300 print:pt-0', hasSidebar && 'lg:ml-16 print:ml-0')}>
+        <LocationStatusBanner consent={consent} isTracking={isTracking} permission={permission} />
         <div className="p-4 sm:p-6 lg:p-8 print:p-0">
           <Outlet />
         </div>

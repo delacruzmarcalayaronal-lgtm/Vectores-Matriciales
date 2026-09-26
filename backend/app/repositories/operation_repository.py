@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from ..models import Operation
 from ..schemas import OperationOut, Page
+from .base import BaseRepository
 
 
-class OperationRepository:
+class OperationRepository(BaseRepository):
     """Acceso a datos del historial de operaciones (flujo 9.3 del Plan Maestro)."""
-
-    def __init__(self, db: Session) -> None:
-        self.db = db
 
     def list_page(
         self,

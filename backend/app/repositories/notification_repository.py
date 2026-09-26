@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from ..models import Notification, NotificationRead, utcnow
 from ..schemas import NotificationOut, NotificationUpsert
 from ..api.helpers import new_id
+from .base import BaseRepository
 
 
-class NotificationRepository:
-    def __init__(self, db: Session) -> None:
-        self.db = db
-
+class NotificationRepository(BaseRepository):
     def list_for_user(self, company_id: str, user_id: str) -> list[NotificationOut]:
         notifications = self.db.scalars(
             select(Notification)

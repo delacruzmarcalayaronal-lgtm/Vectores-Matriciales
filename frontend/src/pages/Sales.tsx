@@ -9,6 +9,7 @@ import { useForm, useFieldArray, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Sale } from '../types';
 import { saleSchema, type SaleForm } from '../schemas';
+import { formatCurrency, formatDateTime } from '../utils/format';
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Borrador',
@@ -174,11 +175,11 @@ export function Sales() {
             data={filteredSales}
             columns={[
               { key: 'saleNumber', header: 'N° Venta', render: (row) => <span className="font-mono font-medium">{row.saleNumber}</span> },
-              { key: 'date', header: 'Fecha', render: (row) => new Date(row.date).toLocaleString('es-PE') },
+              { key: 'date', header: 'Fecha', render: (row) => formatDateTime(row.date) },
               { key: 'branchId', header: 'Sucursal', render: (row) => branches?.find(b => b.id === row.branchId)?.name || row.branchId },
-              { key: 'subtotal', header: 'Subtotal', render: (row) => `S/ ${row.subtotal.toLocaleString()}` },
-              { key: 'tax', header: 'IGV', render: (row) => `S/ ${row.tax.toLocaleString()}` },
-              { key: 'total', header: 'Total', render: (row) => <span className="font-medium">S/ {row.total.toLocaleString()}</span> },
+    { key: 'subtotal', header: 'Subtotal', render: (row) => formatCurrency(row.subtotal) },
+    { key: 'tax', header: 'IGV', render: (row) => formatCurrency(row.tax) },
+    { key: 'total', header: 'Total', render: (row) => <span className="font-medium">{formatCurrency(row.total)}</span> },
               { key: 'status', header: 'Estado', render: (row) => (
                 <Badge variant={STATUS_VARIANTS[row.status]}>
                   {STATUS_LABELS[row.status]}
@@ -358,7 +359,7 @@ export function Sales() {
             <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <dt className="text-secondary">Fecha</dt>
-                <dd className="text-text">{new Date(viewingSale.date).toLocaleString('es-PE')}</dd>
+                <dd className="text-text">{formatDateTime(viewingSale.date)}</dd>
               </div>
               <div>
                 <dt className="text-secondary">Sucursal</dt>
@@ -370,7 +371,7 @@ export function Sales() {
               </div>
               <div>
                 <dt className="text-secondary">Total</dt>
-                <dd className="font-semibold text-text">S/ {viewingSale.total.toLocaleString()}</dd>
+                <dd className="font-semibold text-text">{formatCurrency(viewingSale.total)}</dd>
               </div>
             </dl>
 

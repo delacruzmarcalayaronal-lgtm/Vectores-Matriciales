@@ -13,6 +13,7 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Product, Category } from '../types';
 import { productSchema, categorySchema, type ProductForm, type CategoryForm } from '../schemas';
+import { formatCurrency } from '../utils/format';
 
 export function Products() {
   const [search, setSearch] = useState('');
@@ -202,9 +203,9 @@ export function Products() {
                 <span className="flex items-center gap-1"><Tag className="w-4 h-4" />{categories?.find(c => c.id === row.categoryId)?.name || row.categoryId}</span>
               )},
               { key: 'unitPrice', header: 'Precio Venta', render: (row) => (
-                <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" />S/ {row.unitPrice.toLocaleString()}</span>
+                <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" />{formatCurrency(row.unitPrice)}</span>
               )},
-              { key: 'costPrice', header: 'Costo', render: (row) => `S/ ${row.costPrice.toLocaleString()}` },
+              { key: 'costPrice', header: 'Costo', render: (row) => formatCurrency(row.costPrice) },
               { key: 'stock', header: 'Stock', render: (row) => (
                 <span className="flex items-center gap-1"><Box className="w-4 h-4" />{row.stock}</span>
               )},

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.algorithms.operations import run_operation
+from app.algorithms import run_operation
 
 
 class TestVectors:

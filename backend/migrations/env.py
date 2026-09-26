@@ -11,7 +11,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.core.config import settings  # noqa: E402
-from app.db import Base  # noqa: E402
+from app.core.database import Base  # noqa: E402
 from app import models  # noqa: F401,E402
 
 config = context.config
