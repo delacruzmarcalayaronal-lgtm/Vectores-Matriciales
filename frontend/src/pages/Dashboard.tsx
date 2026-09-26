@@ -172,6 +172,7 @@ export function Dashboard() {
       <Tabs tabs={dashboardTabs} activeTab={activeTab} onChange={handleChange} />
 
       <TabPanel id="resumen" activeTab={activeTab}>
+      <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
         <span className={chipClass}>
           <ShieldCheck className="w-4 h-4 text-primary" />
@@ -254,7 +255,7 @@ export function Dashboard() {
           <CardDescription>Selecciona un módulo para comenzar a trabajar</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {myModules.map((module) => (
               <Link
                 key={module.key}
@@ -299,6 +300,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
+      </div>
       </TabPanel>
 
       <TabPanel id="ventas" activeTab={activeTab}>
