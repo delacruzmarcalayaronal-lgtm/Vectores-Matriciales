@@ -56,7 +56,7 @@ export function LinearCombinations() {
     const form = formRef.current;
     if (form) {
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const first = form.querySelector<HTMLInputElement>('input[type="text"]');
+      const first = form.querySelector<HTMLInputElement>('input:not([type="checkbox"])');
       window.setTimeout(() => first?.focus(), 400);
     }
   };
