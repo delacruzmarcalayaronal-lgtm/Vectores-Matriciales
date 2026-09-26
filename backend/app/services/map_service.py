@@ -8,6 +8,10 @@ from ..schemas.location import WorkerLastLocation
 
 STATUS_COLORS = {"active": "green", "idle": "orange", "offline": "red"}
 
+def _render(fmap: folium.Map) -> str:
+    """HTML completo del documento Folium (sin el embed iframe de Jupyter)."""
+    return fmap.get_root().render()
+
 
 def _popup_html(name: str, code: str, seen: str, accuracy: float | None, status: str) -> str:
     acc = f"{accuracy:.0f} m" if accuracy is not None else "s/d"
@@ -52,7 +56,7 @@ def generate_workers_map(locations: list[WorkerLastLocation]) -> str:
             icon=folium.Icon(color="gray", icon="info-sign"),
         ).add_to(fmap)
     folium.LayerControl().add_to(fmap)
-    return fmap._repr_html_()
+    return _render(fmap)
 
 
 def generate_worker_history_map(
@@ -70,7 +74,7 @@ def generate_worker_history_map(
             tooltip="Sin historial",
             icon=folium.Icon(color="gray", icon="info-sign"),
         ).add_to(fmap)
-        return fmap._repr_html_()
+        return _render(fmap)
 
     points = [[row.latitude, row.longitude] for row in locations]
     folium.PolyLine(points, color="#2563EB", weight=3, opacity=0.8).add_to(fmap)
@@ -88,7 +92,7 @@ def generate_worker_history_map(
         icon=folium.Icon(color="red", icon="stop"),
     ).add_to(fmap)
     folium.LayerControl().add_to(fmap)
-    return fmap._repr_html_()
+    return _render(fmap)
 
 
 def generate_geofence_map(
@@ -124,7 +128,7 @@ def generate_geofence_map(
             icon=folium.Icon(color=color, icon="user"),
         ).add_to(fmap)
     folium.LayerControl().add_to(fmap)
-    return fmap._repr_html_()
+    return _render(fmap)
 
 
 def _is_outside(
