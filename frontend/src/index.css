@@ -178,4 +178,7 @@ html.dark.theme-matrix {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  .recharts-tooltip-wrapper {
+    display: none !important;
+  }
 }

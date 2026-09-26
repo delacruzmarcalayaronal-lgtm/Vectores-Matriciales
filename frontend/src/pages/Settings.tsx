@@ -305,9 +305,9 @@ export function Settings() {
   const exampleSales = () => {
     const csv = [
       'branchId,productId,quantity,unitPrice,discount,status,notes',
-      'Lima Centro,SKU-0001,2,1500,0,confirmed,Venta de ejemplo',
-      'Arequipa,Mouse Logitech M170,1,45,5,confirmed,Con descuento',
-      'br3,P001,1,4500,0,confirmed,Venta por ID de sucursal',
+      'Lima Centro,HP-EB840,1,4500,0,confirmed,Venta de ejemplo',
+      'Arequipa,LOG-M170,2,45,5,confirmed,Con descuento',
+      'Trujillo,SAM-M24,1,750,0,confirmed,Venta por nombre de producto',
     ].join('\n');
     downloadFile('ejemplo_ventas.csv', csv, 'text/csv');
     show('Ejemplo descargado: ejemplo_ventas.csv. Edítalo y usa Importar Ventas.');
@@ -322,7 +322,11 @@ export function Settings() {
           show('El CSV no tiene filas de datos. Columnas: sku,name,category,unitPrice,costPrice,stock,minStock,unit,description');
           return;
         }
-        const categories = await categoriesApi.list(COMPANY_ID);
+        const categories = await categoriesApi.list(COMPANY_ID).catch(() => null);
+        if (!categories) {
+          show('No se pudo contactar la API al importar. Reintenta en unos segundos.');
+          return;
+        }
         const byName = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
         let ok = 0;
         const failed: string[] = [];
@@ -362,7 +366,7 @@ export function Settings() {
       })
       .catch(error => {
         console.error('Import products error:', error);
-        show('No se pudo leer el archivo CSV.');
+        show('No se pudo leer el archivo desde tu equipo.');
       })
       .finally(() => setBusyKey(null));
   };
@@ -376,10 +380,16 @@ export function Settings() {
           show('El CSV no tiene filas de datos. Columnas: branchId|sucursal,productId|sku|producto,quantity,unitPrice,discount,status,notes');
           return;
         }
-        const [branches, products] = await Promise.all([
-          branchesApi.list(COMPANY_ID),
-          productsApi.list(COMPANY_ID),
+        const [branchesOrNull, productsOrNull] = await Promise.all([
+          branchesApi.list(COMPANY_ID).catch(() => null),
+          productsApi.list(COMPANY_ID).catch(() => null),
         ]);
+        if (!branchesOrNull || !productsOrNull) {
+          show('No se pudo contactar la API al importar. Reintenta en unos segundos.');
+          return;
+        }
+        const branches = branchesOrNull;
+        const products = productsOrNull;
         const branchById = new Map(branches.map(b => [b.id, b]));
         const branchByName = new Map(branches.map(b => [b.name.toLowerCase(), b]));
         const productById = new Map(products.map(p => [p.id, p]));
@@ -416,7 +426,7 @@ export function Settings() {
       })
       .catch(error => {
         console.error('Import sales error:', error);
-        show('No se pudo leer el archivo CSV.');
+        show('No se pudo leer el archivo desde tu equipo.');
       })
       .finally(() => setBusyKey(null));
   };
