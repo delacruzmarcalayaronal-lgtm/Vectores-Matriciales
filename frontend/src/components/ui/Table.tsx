@@ -342,7 +342,7 @@ export interface TabsProps {
 export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
   return (
     <div className={clsx('border-b border-border', className)}>
-      <nav className="flex gap-1" role="tablist">
+      <nav className="flex gap-2" role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -381,7 +381,7 @@ export function TabPanel({ id, activeTab, children, className }: TabPanelProps) 
       role="tabpanel"
       id={`${id}-panel`}
       aria-labelledby={`${id}-tab`}
-      className={clsx('mt-4', className)}
+      className={clsx(className)}
     >
       {children}
     </div>

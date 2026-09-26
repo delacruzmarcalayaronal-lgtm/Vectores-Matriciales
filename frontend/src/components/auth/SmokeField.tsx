@@ -438,5 +438,5 @@ export function SmokeField({
     };
   }, [density, speed, interactive]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full print:hidden" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full print:hidden pointer-events-none" aria-hidden="true" />;
 }

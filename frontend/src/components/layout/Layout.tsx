@@ -51,7 +51,7 @@ export function Layout() {
         sidebarExpanded={sidebarExpanded}
       />
 
-      <main className={clsx('pt-16 transition-all duration-300 print:pt-0', hasSidebar && 'lg:ml-16 print:ml-0')}>
+      <main className={clsx('relative pt-16 transition-all duration-300 print:pt-0', hasSidebar && 'lg:ml-16 print:ml-0')}>
         <div className="p-4 sm:p-6 lg:p-8 print:p-0">
           <Outlet />
         </div>
