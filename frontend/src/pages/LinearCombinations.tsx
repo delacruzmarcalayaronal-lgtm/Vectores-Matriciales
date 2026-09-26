@@ -36,15 +36,16 @@ export function LinearCombinations() {
   );
 
   const handleVectorSelect = (id: string, checked: boolean) => {
-    if (checked) {
-      setSelectedVectors([...selectedVectors, id]);
-      setWeights(prev => ({ ...prev, [id]: 1 }));
-    } else {
-      setSelectedVectors(selectedVectors.filter(v => v !== id));
-      setWeights(prev => { const n = { ...prev }; delete n[id]; return n; });
-    }
-    setValue('vectorIds', selectedVectors);
-    setValue('weights', weights);
+    const next = checked
+      ? [...selectedVectors, id]
+      : selectedVectors.filter(v => v !== id);
+    const nextWeights = { ...weights };
+    if (checked) nextWeights[id] = 1;
+    else delete nextWeights[id];
+    setSelectedVectors(next);
+    setWeights(nextWeights);
+    setValue('vectorIds', next);
+    setValue('weights', nextWeights);
   };
 
   const handleWeightChange = (id: string, value: string) => {
@@ -57,6 +58,7 @@ export function LinearCombinations() {
     reset({ name: '', description: '', vectorIds: [], weights: {} });
     setSelectedVectors([]);
     setWeights({});
+    setViewingResult(null);
     const form = formRef.current;
     if (form) {
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -87,7 +89,7 @@ export function LinearCombinations() {
   const getResultVector = (): number[] | null => {
     if (!viewingResult || !vectors) return null;
     const selectedVecs = selectedVectors.map(id => vectors.find(v => v.id === id));
-    if (selectedVecs.some(v => !v)) return null;
+    if (selectedVecs.length === 0 || selectedVecs.some(v => !v)) return null;
     
     const dim = selectedVecs[0]!.dimension;
     const result = new Array(dim).fill(0);

@@ -36,6 +36,7 @@ import {
 import { useAuth } from '../contexts/useAuth';
 import { useNotice } from '../hooks/useNotice';
 import { innerPercentLabel, darkTooltipStyle, legendFormatter, metaComplianceTooltip } from '../lib/chartLabels';
+import { ChartZoom } from '../components/charts/ChartZoom';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -241,7 +242,7 @@ export function Reports() {
       </div>
 
       <div className="border-b border-border print:hidden">
-        <nav className="flex gap-1" role="tablist">
+        <nav className="flex gap-1 overflow-x-auto snap-x no-scrollbar" role="tablist">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -250,7 +251,7 @@ export function Reports() {
               aria-controls={`${tab.id}-panel`}
               id={`${tab.id}-tab`}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+              className={`flex-none whitespace-nowrap snap-start flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'border-primary text-primary'
                   : 'border-transparent text-secondary hover:text-text hover:border-gray-300'
@@ -270,6 +271,7 @@ export function Reports() {
               <CardTitle>Ventas por Sucursal</CardTitle>
             </CardHeader>
             <CardContent>
+              <ChartZoom title="Ventas por Sucursal">
               <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={branchChartData} layout="vertical">
@@ -283,6 +285,7 @@ export function Reports() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              </ChartZoom>
             </CardContent>
           </Card>
 
@@ -291,6 +294,7 @@ export function Reports() {
               <CardTitle>Top Productos</CardTitle>
             </CardHeader>
             <CardContent>
+              <ChartZoom title="Top Productos">
               <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -302,6 +306,7 @@ export function Reports() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+              </ChartZoom>
             </CardContent>
           </Card>
 
@@ -310,6 +315,7 @@ export function Reports() {
               <CardTitle>Cumplimiento de Metas</CardTitle>
             </CardHeader>
             <CardContent>
+              <ChartZoom title="Cumplimiento de Metas">
               <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={complianceData} layout="vertical">
@@ -321,6 +327,7 @@ export function Reports() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              </ChartZoom>
             </CardContent>
           </Card>
 
@@ -329,6 +336,7 @@ export function Reports() {
               <CardTitle>Rotación de Inventario</CardTitle>
             </CardHeader>
             <CardContent>
+              <ChartZoom title="Rotación de Inventario">
               <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={rotationData}>
@@ -343,6 +351,7 @@ export function Reports() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              </ChartZoom>
             </CardContent>
           </Card>
         </div>

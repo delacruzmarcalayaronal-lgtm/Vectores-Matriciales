@@ -342,7 +342,7 @@ export interface TabsProps {
 export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
   return (
     <div className={clsx('border-b border-border', className)}>
-      <nav className="flex gap-2" role="tablist">
+      <nav className="flex gap-2 overflow-x-auto snap-x no-scrollbar" role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -352,7 +352,7 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
             id={`${tab.id}-tab`}
             onClick={() => onChange(tab.id)}
             className={clsx(
-              'flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors',
+              'flex-none whitespace-nowrap snap-start flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors',
               activeTab === tab.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-secondary hover:text-text hover:border-gray-300'

@@ -72,24 +72,22 @@ export function Operations() {
 
   const handleVectorSelect = (id: string, checked: boolean) => {
     const max = selectedTypeConfig.maxInputs;
-    if (checked) {
-      if (max && selectedVectors.length >= max) return;
-      setSelectedVectors([...selectedVectors, id]);
-    } else {
-      setSelectedVectors(selectedVectors.filter(v => v !== id));
-    }
-    setValue('inputVectorIds', selectedVectors);
+    if (checked && max && selectedVectors.length >= max) return;
+    const next = checked
+      ? [...selectedVectors, id]
+      : selectedVectors.filter(v => v !== id);
+    setSelectedVectors(next);
+    setValue('inputVectorIds', next);
   };
 
   const handleMatrixSelect = (id: string, checked: boolean) => {
     const max = selectedTypeConfig.maxInputs;
-    if (checked) {
-      if (max && selectedMatrices.length >= max) return;
-      setSelectedMatrices([...selectedMatrices, id]);
-    } else {
-      setSelectedMatrices(selectedMatrices.filter(m => m !== id));
-    }
-    setValue('inputMatrixIds', selectedMatrices);
+    if (checked && max && selectedMatrices.length >= max) return;
+    const next = checked
+      ? [...selectedMatrices, id]
+      : selectedMatrices.filter(m => m !== id);
+    setSelectedMatrices(next);
+    setValue('inputMatrixIds', next);
   };
 
   const handleWeightChange = (vectorId: string, value: string) => {

@@ -24,6 +24,7 @@ import { useAuth } from '../contexts/useAuth';
 import { MODULES, MODULE_COLOR_CLASSES } from '../lib/modules';
 import { ROLE_LABELS, ROLE_ICONS, type ModuleKey } from '../lib/permissions';
 import { innerPercentLabel, darkTooltipStyle, legendFormatter, metaComplianceTooltip } from '../lib/chartLabels';
+import { ChartZoom } from '../components/charts/ChartZoom';
 import {
   BarChart,
   Bar,
@@ -313,6 +314,7 @@ export function Dashboard() {
             <CardDescription>Ingresos generados por cada sede en el período actual</CardDescription>
           </CardHeader>
           <CardContent>
+            <ChartZoom title="Ventas por Sucursal">
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={branchChartData} layout="vertical">
@@ -332,6 +334,7 @@ export function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            </ChartZoom>
           </CardContent>
         </Card>
 
@@ -341,6 +344,7 @@ export function Dashboard() {
             <CardDescription>Productos con mayor contribución a los ingresos</CardDescription>
           </CardHeader>
           <CardContent>
+            <ChartZoom title="Top Productos por Ingresos">
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -368,6 +372,7 @@ export function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
+            </ChartZoom>
           </CardContent>
         </Card>
       </div>
@@ -409,6 +414,7 @@ export function Dashboard() {
           <CardDescription>Días de stock y rotación por producto</CardDescription>
         </CardHeader>
         <CardContent>
+          <ChartZoom title="Rotación de Inventario">
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={rotationData}>
@@ -441,6 +447,7 @@ export function Dashboard() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+          </ChartZoom>
         </CardContent>
       </Card>
 
@@ -480,6 +487,7 @@ export function Dashboard() {
           <CardDescription>Porcentaje de cumplimiento de objetivos por sucursal/producto</CardDescription>
         </CardHeader>
         <CardContent>
+          <ChartZoom title="Cumplimiento de Metas">
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={complianceData} layout="vertical">
@@ -491,6 +499,7 @@ export function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          </ChartZoom>
         </CardContent>
       </Card>
       ) : emptyTab('Tu rol no incluye acceso a las metas.')}

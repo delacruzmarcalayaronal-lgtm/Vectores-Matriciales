@@ -161,8 +161,38 @@ html.dark.theme-matrix {
   #carnet-print,
   #carnet-print *,
   #report-print,
-  #report-print * {
+  #report-print *,
+  #chart-zoom-print,
+  #chart-zoom-print * {
     visibility: visible !important;
+  }
+  html.chart-zoom-active #report-print,
+  html.chart-zoom-active #carnet-print {
+    display: none !important;
+  }
+  /* Gráfico ampliado: imprimir solo ese gráfico a página completa */
+  #chart-zoom-print {
+    position: fixed !important;
+    inset: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 8px !important;
+    background: #ffffff !important;
+  }
+  #chart-zoom-print .zoom-controls {
+    display: none !important;
+  }
+  #chart-zoom-print .zoom-chart {
+    flex: 1 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+  #chart-zoom-print .zoom-chart > * {
+    height: calc(100vh - 16px) !important;
+  }
+  #chart-zoom-print .bg-card {
+    background: #ffffff !important;
+    color: #0f172a !important;
   }
   #carnet-print {
     position: fixed;
@@ -227,4 +257,17 @@ html.dark.theme-matrix {
   .recharts-tooltip-wrapper {
     display: none !important;
   }
+}
+
+/* Tabs desplazables con el dedo en móviles */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Gráfico ampliado en pantalla: el gráfico llena el área disponible */
+#chart-zoom-print .zoom-chart > * {
+  height: 100% !important;
 }
