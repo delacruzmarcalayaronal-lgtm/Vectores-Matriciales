@@ -53,6 +53,11 @@ html.dark {
   --surface-4: #0F172A;
   --surface-hover: #27354C;
   --sidebar-gradient: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+  --tw-ring-offset-color: var(--color-bg);
+}
+/* aplicado por elemento: el reset `* { --tw-ring-offset-color:#fff }` gana sobre la herencia */
+html.dark * {
+  --tw-ring-offset-color: var(--color-bg);
 }
 
 html.dark .bg-white {
@@ -173,10 +178,31 @@ html.dark.theme-matrix {
     padding: 16px !important;
     background: var(--color-bg) !important;
     color: var(--color-text) !important;
+    overflow: hidden !important;
   }
   #report-print * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  /* Un gráfico por hoja, centrado y sin desbordes */
+  #report-print .print-charts-grid {
+    display: block !important;
+  }
+  #report-print .print-chart-page {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+    width: 100% !important;
+    max-width: 820px;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  #report-print .print-chart-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
   .recharts-tooltip-wrapper {
     display: none !important;

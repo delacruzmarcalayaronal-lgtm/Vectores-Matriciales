@@ -264,8 +264,8 @@ export function Reports() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print-charts-grid">
+          <Card className="print-chart-page">
             <CardHeader>
               <CardTitle>Ventas por Sucursal</CardTitle>
             </CardHeader>
@@ -286,7 +286,7 @@ export function Reports() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="print-chart-page">
             <CardHeader>
               <CardTitle>Top Productos</CardTitle>
             </CardHeader>
@@ -305,7 +305,7 @@ export function Reports() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="print-chart-page">
             <CardHeader>
               <CardTitle>Cumplimiento de Metas</CardTitle>
             </CardHeader>
@@ -324,7 +324,7 @@ export function Reports() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="print-chart-page">
             <CardHeader>
               <CardTitle>Rotación de Inventario</CardTitle>
             </CardHeader>

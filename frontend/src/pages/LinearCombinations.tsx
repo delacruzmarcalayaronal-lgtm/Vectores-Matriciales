@@ -8,14 +8,15 @@ import { useVectors, useExecuteOperation } from '../hooks/useApi';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { linearComboSchema, type LinearComboForm } from '../schemas';
+import { useNotice } from '../hooks/useNotice';
 
 export function LinearCombinations() {
   const [search, _setSearch] = useState('');
   const [selectedVectors, setSelectedVectors] = useState<string[]>([]);
   const [weights, setWeights] = useState<Record<string, number>>({});
-  const [_isModalOpen, setIsModalOpen] = useState(false);
   const [viewingResult, setViewingResult] = useState<any>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const { show, notice } = useNotice();
 
   const { data: vectors } = useVectors('1');
   const executeOperation = useExecuteOperation('1');
@@ -23,6 +24,7 @@ export function LinearCombinations() {
   const {
     register,
     handleSubmit,
+    reset,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<LinearComboForm>({
@@ -52,12 +54,17 @@ export function LinearCombinations() {
   };
 
   const openModal = () => {
-    setIsModalOpen(true);
+    reset({ name: '', description: '', vectorIds: [], weights: {} });
+    setSelectedVectors([]);
+    setWeights({});
     const form = formRef.current;
     if (form) {
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
       const first = form.querySelector<HTMLInputElement>('input:not([type="checkbox"])');
-      window.setTimeout(() => first?.focus(), 400);
+      window.setTimeout(() => {
+        first?.focus();
+        show('Formulario listo: completa los datos y haz clic en "Calcular Combinación Lineal".');
+      }, 400);
     }
   };
 
@@ -72,7 +79,6 @@ export function LinearCombinations() {
         parameters: { weights: data.weights },
       });
       setViewingResult(result);
-      setIsModalOpen(false);
     } catch (error) {
       console.error('Error executing linear combination:', error);
     }
@@ -275,6 +281,7 @@ export function LinearCombinations() {
           </CardContent>
         </Card>
       </div>
+      {notice}
     </div>
   );
 }

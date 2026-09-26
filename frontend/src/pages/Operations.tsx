@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Table, Badge, Modal } from '../components/ui/Table';
-import { useVectors, useMatrices, useOperations, useExecuteOperation } from '../hooks/useApi';
+import { useVectors, useMatrices, useOperations, useExecuteOperation, useDeleteOperation } from '../hooks/useApi';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Operation, OperationType } from '../types';
@@ -19,11 +19,25 @@ export function Operations() {
   const [weights, setWeights] = useState<Record<string, string>>({});
   const [executing, setExecuting] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [viewingOperation, setViewingOperation] = useState<Operation | null>(null);
+  const [deletingOperation, setDeletingOperation] = useState<Operation | null>(null);
 
   const { data: vectors } = useVectors('1');
   const { data: matrices } = useMatrices('1');
   const { data: operations, isLoading, refetch } = useOperations('1');
   const executeOperation = useExecuteOperation('1');
+  const deleteOperation = useDeleteOperation('1');
+
+  const confirmDeleteOperation = async () => {
+    if (!deletingOperation) return;
+    try {
+      await deleteOperation.mutateAsync(deletingOperation.id);
+      setDeletingOperation(null);
+      refetch();
+    } catch (error) {
+      console.error('Error deleting operation:', error);
+    }
+  };
 
   const {
     register,
@@ -285,17 +299,17 @@ export function Operations() {
                 { key: 'status', header: 'Estado', render: (row) => getStatusBadge(row.status) },
                 { key: 'executionTime', header: 'Tiempo', render: (row) => `${row.executionTimeMs} ms` },
                 { key: 'createdAt', header: 'Fecha', render: (row) => new Date(row.createdAt).toLocaleString('es-PE') },
-                { key: 'actions', header: 'Acciones', render: (_row) => (
+                { key: 'actions', header: 'Acciones', render: (row) => (
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => {}}
+                      onClick={() => setViewingOperation(row)}
                       className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100 transition-colors"
-                      aria-label="Ver resultado"
+                      aria-label="Ver detalle"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {}}
+                      onClick={() => setDeletingOperation(row)}
                       className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100 transition-colors"
                       aria-label="Eliminar"
                     >
@@ -330,6 +344,67 @@ export function Operations() {
           </div>
         </Modal>
       )}
+
+      {viewingOperation && (
+        <Modal
+          isOpen={!!viewingOperation}
+          onClose={() => setViewingOperation(null)}
+          title="Detalle de la Operación"
+          description={`${operationTypes.find(t => t.value === viewingOperation.type)?.label ?? viewingOperation.type} — ${viewingOperation.name}`}
+          size="lg"
+        >
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><span className="text-secondary">Estado:</span> {getStatusBadge(viewingOperation.status)}</div>
+              <div><span className="text-secondary">Tiempo:</span> <span className="font-mono">{viewingOperation.executionTimeMs} ms</span></div>
+              <div><span className="text-secondary">Fecha:</span> {new Date(viewingOperation.createdAt).toLocaleString('es-PE')}</div>
+              <div><span className="text-secondary">Descripción:</span> {viewingOperation.description || '—'}</div>
+            </div>
+
+            {viewingOperation.errorMessage && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                {viewingOperation.errorMessage}
+              </div>
+            )}
+
+            <div>
+              <p className="font-medium mb-1">Parámetros</p>
+              <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-auto max-h-40">{JSON.stringify(viewingOperation.parameters ?? {}, null, 2)}</pre>
+            </div>
+
+            <div>
+              <p className="font-medium mb-1">Resultados</p>
+              <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-auto max-h-32">{JSON.stringify({
+                estado: viewingOperation.status,
+                error: viewingOperation.errorMessage ?? null,
+                vectorResultado: viewingOperation.resultVectorId ?? null,
+                matrizResultado: viewingOperation.resultMatrixId ?? null,
+              }, null, 2)}</pre>
+            </div>
+
+            <div>
+              <p className="font-medium mb-1">Entradas</p>
+              <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-auto max-h-40">{JSON.stringify({ vectores: viewingOperation.inputVectors, matrices: viewingOperation.inputMatrices }, null, 2)}</pre>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setViewingOperation(null)}>Cerrar</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      <Modal
+        isOpen={!!deletingOperation}
+        onClose={() => setDeletingOperation(null)}
+        title="Eliminar Operación"
+        description={`¿Estás seguro de eliminar la operación "${deletingOperation?.name}"? Esta acción no se puede deshacer.`}
+      >
+        <div className="flex justify-end gap-3 pt-4">
+          <Button variant="outline" onClick={() => setDeletingOperation(null)}>Cancelar</Button>
+          <Button variant="danger" onClick={confirmDeleteOperation} loading={deleteOperation.isPending}>Eliminar</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

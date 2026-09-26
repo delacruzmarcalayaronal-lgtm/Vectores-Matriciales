@@ -165,6 +165,15 @@ export function useExecuteOperation(companyId: string, options?: UseMutationOpti
   });
 }
 
+export function useDeleteOperation(companyId: string) {
+  const api = getApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.operations.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['operations', companyId] }),
+  });
+}
+
 export function useDashboardStats(companyId: string, options?: UseQueryOptions<DashboardStats>) {
   const api = getApi();
   return useQuery({ queryKey: ['reports', 'dashboard', companyId], queryFn: () => api.reports.getDashboard(companyId), enabled: !!companyId, ...options });
