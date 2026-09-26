@@ -291,6 +291,28 @@ export function Settings() {
     show('Respaldo completo descargado (JSON).');
   });
 
+  const exampleProducts = () => {
+    const csv = [
+      'sku,name,category,unitPrice,costPrice,stock,minStock,unit,description',
+      'P001,Laptop HP EliteBook 840,Informatica,4500,3800,10,3,unidad,Portatil corporativo',
+      'P002,Mouse Logitech M170,Accesorios,45,30,50,10,unidad,Mouse inalambrico',
+      'P001,Monitor Samsung 24 FHD,Informatica,750,620,20,5,unidad,Monitor 24 pulgadas',
+    ].join('\n');
+    downloadFile('ejemplo_productos.csv', csv, 'text/csv');
+    show('Ejemplo descargado: ejemplo_productos.csv. Edítalo y usa Importar Productos.');
+  };
+
+  const exampleSales = () => {
+    const csv = [
+      'branchId,productId,quantity,unitPrice,discount,status,notes',
+      'Lima Centro,SKU-0001,2,1500,0,confirmed,Venta de ejemplo',
+      'Arequipa,Mouse Logitech M170,1,45,5,confirmed,Con descuento',
+      'br3,P001,1,4500,0,confirmed,Venta por ID de sucursal',
+    ].join('\n');
+    downloadFile('ejemplo_ventas.csv', csv, 'text/csv');
+    show('Ejemplo descargado: ejemplo_ventas.csv. Edítalo y usa Importar Ventas.');
+  };
+
   const importProducts = (file: File) => {
     setBusyKey('imp-products');
     file.text()
@@ -699,6 +721,14 @@ export function Settings() {
               <div className="mt-4 text-xs text-secondary space-y-1">
                 <p><span className="font-medium text-text">Productos CSV:</span> sku,name,category,unitPrice,costPrice,stock,minStock,unit,description (category se crea si no existe; acepta nombres en español: nombre,precio,costo).</p>
                 <p><span className="font-medium text-text">Ventas CSV:</span> branchId|sucursal,productId|sku|producto,quantity,unitPrice,discount,status,notes (sucursal y producto pueden ir por nombre o ID; una fila = una venta).</p>
+              </div>
+              <div className="flex flex-wrap gap-4 mt-4">
+                <Button variant="ghost" leftIcon={<Download className="w-4 h-4" />} onClick={exampleProducts}>
+                  Ejemplo Productos (CSV)
+                </Button>
+                <Button variant="ghost" leftIcon={<Download className="w-4 h-4" />} onClick={exampleSales}>
+                  Ejemplo Ventas (CSV)
+                </Button>
               </div>
             </div>
           </CardContent>

@@ -138,10 +138,13 @@ html.dark.theme-matrix {
 
 @media print {
   @page {
-    margin: 12mm;
+    margin: 0;
   }
+  html,
   body {
-    background: #fff !important;
+    background: var(--color-bg) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   body * {
     visibility: hidden !important;
@@ -167,24 +170,12 @@ html.dark.theme-matrix {
   }
   #report-print {
     position: static !important;
-    color: #0F172A !important;
-    background: #fff !important;
+    padding: 16px !important;
+    background: var(--color-bg) !important;
+    color: var(--color-text) !important;
   }
   #report-print * {
-    color: #0F172A !important;
-    background-color: transparent !important;
-    border-color: #CBD5E1 !important;
-    box-shadow: none !important;
-  }
-  #report-print .recharts-sector,
-  #report-print .recharts-bar-rectangle,
-  #report-print .recharts-line-curve,
-  #report-print .recharts-line-dot,
-  #report-print .recharts-pie-sector path {
-    opacity: 1 !important;
-    filter: none !important;
-  }
-  #report-print .recharts-legend-item-text {
-    color: #334155 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
