@@ -8,11 +8,7 @@ import { readBgMotion, BG_MOTION_EVENT } from '../../lib/bgMotion';
 import { useAuth } from '../../contexts/useAuth';
 import { LocationStatusBanner } from '../LocationStatusBanner';
 import { useLocationTracking } from '../../hooks/useLocationTracking';
-
-const readConsent = (): 'accepted' | 'denied' | null => {
-  const value = localStorage.getItem('locationConsent');
-  return value === 'accepted' || value === 'denied' ? value : null;
-};
+import { readConsent, LOCATION_CONSENT_EVENT } from '../../lib/locationConsent';
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -25,10 +21,10 @@ export function Layout() {
 
   useEffect(() => {
     const onChange = () => setConsent(readConsent());
-    window.addEventListener('location-consent-changed', onChange);
+    window.addEventListener(LOCATION_CONSENT_EVENT, onChange);
     window.addEventListener('storage', onChange);
     return () => {
-      window.removeEventListener('location-consent-changed', onChange);
+      window.removeEventListener(LOCATION_CONSENT_EVENT, onChange);
       window.removeEventListener('storage', onChange);
     };
   }, []);

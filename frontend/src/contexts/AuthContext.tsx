@@ -4,6 +4,7 @@ import type { User, AuthResponse } from '../types';
 import { authApi, clearTokens, setTokens } from '../services/api';
 import { mockAuth } from '../services/mockApi';
 import { can, type ModuleKey } from '../lib/permissions';
+import { clearConsent, notifyConsentChanged } from '../lib/locationConsent';
 import { AuthContext, type ProfilePatch } from './auth-context';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
@@ -107,6 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // best-effort: el backend purga la posición en RAM y apaga el rastreo
+    if (!USE_MOCK) {
+      void authApi.logout().catch(() => undefined);
+    }
+    clearConsent();
+    notifyConsentChanged();
     clearTokens();
     setUser(null);
   };

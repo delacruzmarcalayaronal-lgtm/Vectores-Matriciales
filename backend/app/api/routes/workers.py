@@ -50,7 +50,7 @@ def worker_status(
     service = LocationService(db)
     worker = get_or_404(db, Worker, worker_id, "Trabajador")
     owner = db.get(User, worker.userId)
-    location = service.repo.get_latest_by_worker(worker.id)
+    location = service.get_latest_for_worker(worker.id)
     if location is None or owner is None:
         return WorkerStatus(
             workerId=worker.id,
@@ -58,15 +58,15 @@ def worker_status(
             employeeCode=worker.employeeCode,
             status="offline",
         )
-    minutes = service._minutes_ago(location.recordedAt)
+    minutes = service._minutes_ago(location["lastSeen"])
     return WorkerStatus(
         workerId=worker.id,
         name=owner.name,
         employeeCode=worker.employeeCode,
-        latitude=location.latitude,
-        longitude=location.longitude,
-        accuracy=location.accuracy,
-        lastSeen=location.recordedAt,
+        latitude=location["latitude"],
+        longitude=location["longitude"],
+        accuracy=location["accuracy"],
+        lastSeen=location["lastSeen"],
         minutesAgo=minutes,
         status=service.classify_status(minutes),
     )

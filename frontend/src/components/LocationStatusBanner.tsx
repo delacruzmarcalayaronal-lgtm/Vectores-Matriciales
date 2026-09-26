@@ -1,5 +1,6 @@
 import { ShieldAlert, MapPinOff, MapPinCheck, RefreshCcw } from 'lucide-react';
 import { clsx } from 'clsx';
+import { clearConsent, notifyConsentChanged } from '../lib/locationConsent';
 
 interface LocationStatusBannerProps {
   consent: 'accepted' | 'denied' | null;
@@ -11,8 +12,8 @@ export function LocationStatusBanner({ consent, isTracking, permission }: Locati
   if (!consent && permission !== 'denied') return null;
 
   const reactivate = () => {
-    localStorage.removeItem('locationConsent');
-    localStorage.removeItem('locationConsentDate');
+    clearConsent();
+    notifyConsentChanged();
     window.location.reload();
   };
 

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from app.services.location_service import LocationService
 
-LIMA = {"latitude": -12.0464, "longitude": -77.0428}
+# sede estándar (SENATI Independencia): dentro del geofence por defecto
+SEDE = {"latitude": -11.9990329, "longitude": -77.0603744}
+LIMA = SEDE
 
 
 class TestHaversine:
@@ -141,3 +143,79 @@ class TestAdminMap:
             if body["latitude"] is not None:
                 found_with_location = True
         assert found_with_location, "ningún worker con ubicación registrada"
+
+
+class TestSessionPrivacy:
+    """La posición vive solo en RAM: nada en BD, el logout la purga."""
+
+    def test_location_never_persisted_in_database(self, client, operator_token):
+        headers = {"Authorization": f"Bearer {operator_token}"}
+        client.post(
+            "/api/v1/locations/consent",
+            json={"consentStatus": "accepted", "consentVersion": "v1"},
+            headers=headers,
+        )
+        r = client.post("/api/v1/locations", json=SEDE, headers=headers)
+        assert r.status_code == 201, r.text
+
+        from sqlalchemy import create_engine, text
+
+        from app.core.config import settings
+
+        engine = create_engine(settings.DATABASE_URL)
+        try:
+            with engine.connect() as conn:
+                count = conn.execute(text("SELECT count(*) FROM worker_locations")).scalar()
+        finally:
+            engine.dispose()
+        assert count == 0, "las posiciones no deben persistirse en la base de datos"
+
+    def test_logout_purges_position_and_disables_tracking(
+        self, client, admin_token, operator_token
+    ):
+        op = {"Authorization": f"Bearer {operator_token}"}
+        admin = {"Authorization": f"Bearer {admin_token}"}
+        client.post(
+            "/api/v1/locations/consent",
+            json={"consentStatus": "accepted", "consentVersion": "v1"},
+            headers=op,
+        )
+        r = client.post("/api/v1/locations", json=SEDE, headers=op)
+        assert r.status_code == 201, r.text
+
+        latest = client.get("/api/v1/locations/latest", headers=admin).json()
+        assert any(row["employeeCode"] == "44444444" for row in latest), "debe verse en caché"
+
+        r = client.post("/api/v1/auth/logout", headers=op)
+        assert r.status_code == 200, r.text
+
+        latest = client.get("/api/v1/locations/latest", headers=admin).json()
+        assert not any(
+            row["employeeCode"] == "44444444" for row in latest
+        ), "el logout debe purgar la posición de la caché"
+
+        r = client.post("/api/v1/locations", json=SEDE, headers=op)
+        assert r.status_code == 403, "el logout debe apagar el rastreo"
+
+        # restaurar estado para los tests siguientes
+        client.post(
+            "/api/v1/locations/consent",
+            json={"consentStatus": "accepted", "consentVersion": "v1"},
+            headers=op,
+        )
+        client.post("/api/v1/locations", json=SEDE, headers=op)
+
+    def test_cache_expires_after_ttl(self):
+        from datetime import datetime, timedelta, timezone
+
+        from app.services.location_cache import LocationCache
+
+        cache = LocationCache()
+        cache.put("w-ttl", "Test", "9999", -11.99, -77.06, 5.0, None, None, None, True)
+        assert len(cache.latest_rows()) == 1
+
+        with cache._lock:
+            for point in cache._points["w-ttl"]:
+                point["_at"] = datetime.now(timezone.utc) - timedelta(minutes=31)
+        assert cache.latest_rows() == []
+        assert cache.history("w-ttl") == []

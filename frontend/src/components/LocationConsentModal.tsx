@@ -2,9 +2,7 @@ import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { MapPin, Clock, ShieldCheck, XCircle } from 'lucide-react';
 import { locationsApi } from '../services/locationApi';
-
-const CONSENT_KEY = 'locationConsent';
-const CONSENT_DATE_KEY = 'locationConsentDate';
+import { writeConsent } from '../lib/locationConsent';
 
 interface LocationConsentModalProps {
   isOpen: boolean;
@@ -14,14 +12,13 @@ interface LocationConsentModalProps {
 
 export function LocationConsentModal({ isOpen, onAccept, onDeny }: LocationConsentModalProps) {
   const decide = async (status: 'accepted' | 'denied') => {
-    localStorage.setItem(CONSENT_KEY, status);
-    localStorage.setItem(CONSENT_DATE_KEY, new Date().toISOString());
-    window.dispatchEvent(new Event('location-consent-changed'));
     try {
+      // primero al servidor: cuando se active el rastreo, el backend ya lo sabe
       await locationsApi.sendConsent(status);
     } catch {
       // el backend puede estar offline; el estado local permite reintentar después
     }
+    writeConsent(status);
     if (status === 'accepted') onAccept();
     else onDeny();
   };

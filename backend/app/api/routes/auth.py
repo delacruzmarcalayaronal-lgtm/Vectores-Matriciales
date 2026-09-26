@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...core.deps import get_current_user, get_current_user_optional
@@ -41,6 +42,13 @@ def logout(
 ) -> dict:
     if user is not None:
         record_audit(db, user, action="logout", module="identidad", request=request)
+        from ...models import Worker
+        from ...services.location_cache import location_cache
+
+        worker = db.scalar(select(Worker).where(Worker.userId == user.id))
+        if worker is not None:
+            location_cache.remove(worker.id)
+        user.trackingEnabled = False
         db.commit()
     return {"message": "Sesión cerrada"}
 

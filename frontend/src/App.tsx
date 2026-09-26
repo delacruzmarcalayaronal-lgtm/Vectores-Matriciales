@@ -7,6 +7,7 @@ import { useAuth } from './contexts/useAuth';
 import { Layout } from './components/layout/Layout';
 import { LocationConsentModal } from './components/LocationConsentModal';
 import { resolveModule, firstAllowedPath } from './lib/permissions';
+import { hasConsent, LOCATION_CONSENT_EVENT } from './lib/locationConsent';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Empresa } from './pages/Empresa';
@@ -68,14 +69,14 @@ const ModuleGuard = ({ children }: { children: React.ReactNode }) => {
 
 function LocationConsentGate() {
   const { user } = useAuth();
-  const [decided, setDecided] = useState(() => Boolean(localStorage.getItem('locationConsent')));
+  const [decided, setDecided] = useState(() => hasConsent());
 
   useEffect(() => {
-    const onChange = () => setDecided(Boolean(localStorage.getItem('locationConsent')));
-    window.addEventListener('location-consent-changed', onChange);
+    const onChange = () => setDecided(hasConsent());
+    window.addEventListener(LOCATION_CONSENT_EVENT, onChange);
     window.addEventListener('storage', onChange);
     return () => {
-      window.removeEventListener('location-consent-changed', onChange);
+      window.removeEventListener(LOCATION_CONSENT_EVENT, onChange);
       window.removeEventListener('storage', onChange);
     };
   }, []);

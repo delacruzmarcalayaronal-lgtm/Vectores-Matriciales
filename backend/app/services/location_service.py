@@ -15,6 +15,7 @@ from ..schemas.location import (
     WorkerLastLocation,
 )
 from ..repositories.location_repository import LocationRepository
+from .location_cache import location_cache
 
 
 class LocationService:
@@ -69,7 +70,7 @@ class LocationService:
     # ---------- ubicaciones ----------
 
     def save_location(self, user: User, data: LocationCreate) -> LocationResponse:
-        """Guarda la ubicación del usuario y calcula el geofence."""
+        """Registra la ubicación en caché RAM (nunca en la base de datos)."""
         if not user.trackingEnabled:
             from fastapi import HTTPException
 
@@ -78,43 +79,82 @@ class LocationService:
                 detail="Rastreo desactivado: no se ha dado consentimiento",
             )
         worker = self.repo.ensure_worker(user)
-        within = self.is_within_geofence(data.latitude, data.longitude)
-        location = self.repo.create_location(worker.id, data, within)
         self.db.commit()
-        self.db.refresh(location)
+        within = self.is_within_geofence(data.latitude, data.longitude)
+        point = location_cache.put(
+            worker_id=worker.id,
+            name=user.name,
+            code=worker.employeeCode,
+            latitude=data.latitude,
+            longitude=data.longitude,
+            accuracy=data.accuracy,
+            speed=data.speed,
+            heading=data.heading,
+            battery_level=data.batteryLevel,
+            is_within_geofence=within,
+        )
         return LocationResponse(
-            id=location.id,
-            workerId=location.workerId,
-            latitude=location.latitude,
-            longitude=location.longitude,
-            accuracy=location.accuracy,
-            isWithinGeofence=location.isWithinGeofence,
-            recordedAt=location.recordedAt,
+            id=point["id"],
+            workerId=point["workerId"],
+            latitude=point["latitude"],
+            longitude=point["longitude"],
+            accuracy=point["accuracy"],
+            isWithinGeofence=point["isWithinGeofence"],
+            recordedAt=point["recordedAt"],
         )
 
     def get_latest_locations(self) -> list[WorkerLastLocation]:
         out: list[WorkerLastLocation] = []
-        for worker, user, location in self.repo.get_latest_rows():
-            minutes = self._minutes_ago(location.recordedAt)
+        for row in location_cache.latest_rows():
+            minutes = self._minutes_ago(row["lastSeen"])
             out.append(
                 WorkerLastLocation(
-                    workerId=worker.id,
-                    workerName=user.name,
-                    employeeCode=worker.employeeCode,
-                    latitude=location.latitude,
-                    longitude=location.longitude,
-                    accuracy=location.accuracy,
-                    lastSeen=location.recordedAt,
+                    workerId=row["workerId"],
+                    workerName=row["workerName"],
+                    employeeCode=row["employeeCode"],
+                    latitude=row["latitude"],
+                    longitude=row["longitude"],
+                    accuracy=row["accuracy"],
+                    lastSeen=row["lastSeen"],
                     minutesAgo=minutes,
                     status=self.classify_status(minutes),
                 )
             )
         return out
 
+    def get_latest_for_worker(self, worker_id: str) -> dict | None:
+        """Última posición en caché de un trabajador (None si no tiene)."""
+        for row in location_cache.latest_rows():
+            if row["workerId"] == worker_id:
+                return row
+        return None
+
     def get_worker_history(
         self, worker_id: str, start: str | None, end: str | None
     ) -> list[WorkerLocation]:
-        return self.repo.get_history(worker_id, start, end)
+        rows: list[WorkerLocation] = []
+        for point in location_cache.history(worker_id):
+            recorded = point["recordedAt"]
+            if start and recorded < start:
+                continue
+            if end and recorded > end:
+                continue
+            rows.append(
+                WorkerLocation(
+                    id=point["id"],
+                    workerId=point["workerId"],
+                    latitude=point["latitude"],
+                    longitude=point["longitude"],
+                    accuracy=point["accuracy"],
+                    speed=point["speed"],
+                    heading=point["heading"],
+                    batteryLevel=point["batteryLevel"],
+                    isWithinGeofence=point["isWithinGeofence"],
+                    recordedAt=point["recordedAt"],
+                    createdAt=point["createdAt"],
+                )
+            )
+        return rows
 
     def get_workers_outside_geofence(
         self, lat: float, lng: float, radius_km: float
