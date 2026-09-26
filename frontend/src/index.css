@@ -210,13 +210,42 @@ html.dark.theme-matrix {
   #report-print {
     position: static !important;
     padding: 16px !important;
-    background: var(--color-bg) !important;
-    color: var(--color-text) !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
     overflow: hidden !important;
   }
   #report-print * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  /* Letras negras en el PDF: tarjetas, títulos, ejes y leyendas */
+  #report-print .print-chart-page,
+  #report-print .bg-white,
+  #report-print .bg-card {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+  }
+  #report-print .text-text,
+  #report-print .text-secondary,
+  #report-print .recharts-default-legend,
+  #chart-zoom-print .text-text,
+  #chart-zoom-print .text-secondary {
+    color: #0f172a !important;
+  }
+  #report-print .recharts-text,
+  #report-print .recharts-cartesian-axis-tick-value,
+  #chart-zoom-print .recharts-text {
+    fill: #0f172a !important;
+  }
+  #report-print .recharts-legend-item-text,
+  #report-print .recharts-legend-item-text *,
+  #chart-zoom-print .recharts-legend-item-text,
+  #chart-zoom-print .recharts-legend-item-text * {
+    color: #0f172a !important;
+    font-size: 13px !important;
+  }
+  #report-print .recharts-cartesian-axis-tick-value {
+    font-size: 13px !important;
   }
   /* Un gráfico por hoja, centrado en la hoja y sin desbordes */
   #report-print .print-charts-grid {
@@ -250,9 +279,15 @@ html.dark.theme-matrix {
     width: 100% !important;
     height: 100% !important;
   }
-  #report-print .print-chart-page svg.recharts-surface {
+  #report-print .print-chart-page .recharts-wrapper > svg.recharts-surface {
     width: 100% !important;
     height: auto !important;
+  }
+  #report-print .print-chart-page li.recharts-legend-item > svg.recharts-surface,
+  #chart-zoom-print li.recharts-legend-item > svg.recharts-surface {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
   }
   .recharts-tooltip-wrapper {
     display: none !important;

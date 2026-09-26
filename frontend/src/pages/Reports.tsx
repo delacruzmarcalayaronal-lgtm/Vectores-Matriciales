@@ -298,7 +298,7 @@ export function Reports() {
               <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={productChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="revenue" nameKey="name" label={innerPercentLabel} labelLine={false}>
+                    <Pie data={productChartData} cx="50%" cy="50%" innerRadius={75} outerRadius={165} paddingAngle={2} dataKey="revenue" nameKey="name" label={innerPercentLabel} labelLine={false}>
                       {productChartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(value) => [`S/ ${Number(value ?? 0).toLocaleString()}`, 'Ingresos']} contentStyle={darkTooltipStyle} />
@@ -341,7 +341,7 @@ export function Reports() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={rotationData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                    <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
+                    <XAxis dataKey="name" stroke="#64748B" fontSize={12} interval="preserveStartEnd" tickMargin={8} />
                     <YAxis yAxisId="left" stroke="#64748B" fontSize={12} />
                     <YAxis yAxisId="right" orientation="right" stroke="#64748B" fontSize={12} />
                     <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }} />

@@ -30,6 +30,7 @@ export function Vectors() {
     handleSubmit,
     reset,
     control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<VectorForm>({
     resolver: zodResolver(vectorSchema) as Resolver<VectorForm>,
@@ -246,10 +247,18 @@ export function Vectors() {
             label="Valores (separados por comas, espacios o punto y coma)"
             placeholder="Ej: 45, 30, 80, 60, 90"
             value={valuesInput}
-            onChange={e => setValuesInput(e.target.value)}
+            onChange={e => {
+              const v = e.target.value;
+              setValuesInput(v);
+              setValue('values', parseValues(v));
+            }}
             rows={3}
             helperText={`${parseValues(valuesInput).length} valores ingresados`}
-            error={valuesInput && parseValues(valuesInput).length !== watchedDimension ? `Se esperan ${watchedDimension} valores` : undefined}
+            error={
+              valuesInput && parseValues(valuesInput).length !== watchedDimension
+                ? `Se esperan ${watchedDimension} valores`
+                : errors.values?.message
+            }
           />
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>

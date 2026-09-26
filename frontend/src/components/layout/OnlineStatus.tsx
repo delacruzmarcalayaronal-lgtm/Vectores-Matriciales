@@ -16,7 +16,7 @@ export function OnlineStatus({ className }: { className?: string }) {
   return (
     <div
       className={clsx(
-        'flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm text-secondary',
+        'flex items-center gap-2 px-3 py-1.5 bg-white/15 rounded-lg text-sm text-white font-medium',
         className
       )}
       title={online ? 'Conectado al servidor MatrixFlow' : 'Sin conexión al servidor'}

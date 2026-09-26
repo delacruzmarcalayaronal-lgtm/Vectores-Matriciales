@@ -352,8 +352,8 @@ export function Dashboard() {
                     data={productChartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
+                    innerRadius={55}
+                    outerRadius={115}
                     paddingAngle={2}
                     dataKey="revenue"
                     nameKey="name"

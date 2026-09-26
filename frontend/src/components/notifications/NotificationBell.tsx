@@ -84,8 +84,8 @@ export function NotificationBell() {
         onClick={() => setOpen(prev => !prev)}
         className={`relative p-2 rounded-lg border transition-colors ${
           open
-            ? 'bg-primary/10 border-primary/40 text-primary'
-            : 'bg-gray-50 border-transparent text-secondary hover:text-text hover:bg-gray-100'
+            ? 'bg-white/25 border-white/40 text-white'
+            : 'bg-white/15 border-transparent text-white hover:text-white hover:bg-white/25'
         }`}
       >
         <Bell className="w-5 h-5" />

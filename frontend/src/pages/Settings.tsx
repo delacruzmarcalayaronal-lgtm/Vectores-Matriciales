@@ -522,7 +522,7 @@ export function Settings() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text mb-3">Color Primario</label>
+              <label className="block text-sm font-medium text-text mb-3">Color de acento</label>
               <div className="flex flex-wrap items-center gap-3">
                 {TECH_COLORS.map(({ hex, name }) => (
                   <label key={hex} className="relative cursor-pointer" title={name}>
@@ -542,7 +542,7 @@ export function Settings() {
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-secondary mt-3">El cambio se aplica de inmediato y queda guardado en este navegador.</p>
+              <p className="text-xs text-secondary mt-3">Se aplica de inmediato en los botones, la cabecera y toda la interfaz; queda guardado en este navegador.</p>
             </div>
             <div className="pt-4 border-t border-border">
               <div className="flex items-center justify-between gap-4">

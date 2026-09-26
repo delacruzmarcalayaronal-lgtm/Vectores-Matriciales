@@ -14,15 +14,13 @@ import {
   ArrowLeft,
   ScanFace,
   Map,
-  Palette,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { OnlineStatus } from './OnlineStatus';
 import { useAuth } from '../../contexts/useAuth';
 import { type ModuleKey } from '../../lib/permissions';
-import { TECH_COLORS, getStoredPrimary, setPrimaryColor } from '../../lib/theme';
 
 interface NavItem {
   label: string;
@@ -75,30 +73,6 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
   const isDesktop = useIsDesktop();
   const [isHovered, setIsHovered] = useState(false);
   const expanded = !isDesktop || isHovered;
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [primary, setPrimaryState] = useState(() => getStoredPrimary());
-  const paletteRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!paletteOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (paletteRef.current && !paletteRef.current.contains(event.target as Node)) setPaletteOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPaletteOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [paletteOpen]);
-
-  const changePrimary = (hex: string) => {
-    setPrimaryState(hex);
-    setPrimaryColor(hex);
-  };
 
   useEffect(() => {
     onExpandedChange?.(expanded);
@@ -190,53 +164,7 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
         {visibleModules.map(renderItem)}
       </nav>
 
-      <div className="p-3 border-t border-white/10 relative" ref={paletteRef}>
-        {paletteOpen && (
-          <div
-            className={`absolute z-50 w-60 rounded-xl border border-white/10 bg-[#0F172A] p-3 shadow-2xl ${
-              expanded ? 'bottom-full left-0 mb-2' : 'bottom-1 left-full ml-2'
-            }`}
-          >
-            <p className="text-xs font-semibold text-white/70 mb-2">Color de acento</p>
-            <div className="grid grid-cols-6 gap-2">
-              {TECH_COLORS.map(({ hex, name }) => (
-                <button
-                  key={hex}
-                  type="button"
-                  title={name}
-                  aria-label={`Color ${name}`}
-                  onClick={() => changePrimary(hex)}
-                  className={`w-7 h-7 rounded-full transition-transform hover:scale-110 ${
-                    primary.toLowerCase() === hex.toLowerCase()
-                      ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0F172A]'
-                      : ''
-                  }`}
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-            <p className="text-[10px] text-white/40 mt-2">Se aplica de inmediato en toda la app.</p>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setPaletteOpen(prev => !prev)}
-          aria-label="Cambiar color de acento"
-          aria-expanded={paletteOpen}
-          title="Cambiar color"
-          className={`w-full flex items-center gap-3 px-3 py-2 mb-1 rounded-lg transition-colors text-secondary hover:text-white hover:bg-white/10 ${
-            expanded ? '' : 'justify-center'
-          }`}
-        >
-          <span className="relative flex-shrink-0">
-            <Palette className="w-5 h-5" />
-            <span
-              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0F172A]"
-              style={{ backgroundColor: primary }}
-            />
-          </span>
-          {expanded && <span className="font-medium text-sm">Cambiar color</span>}
-        </button>
+      <div className="p-3 border-t border-white/10 relative">
         <ProfileAvatar onClick={onNavigate} />
       </div>
     </aside>
@@ -259,14 +187,15 @@ export function Header({
   return (
     <header
       className={clsx(
-        'h-16 bg-white border-b border-border fixed top-0 left-0 right-0 z-30 flex items-center px-4 sm:px-6 transition-[padding] duration-300 print:hidden',
+        'h-16 border-b border-border fixed top-0 left-0 right-0 z-30 flex items-center px-4 sm:px-6 transition-[padding] duration-300 print:hidden',
         hasSidebar && (sidebarExpanded ? 'lg:pl-72' : 'lg:pl-24')
       )}
+      style={{ backgroundColor: 'var(--color-primary)' }}
     >
       {hasSidebar && (
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-lg text-secondary hover:text-text hover:bg-gray-100 mr-2"
+          className="lg:hidden p-2 rounded-lg text-white/90 hover:text-white hover:bg-white/20 mr-2"
           aria-label="Abrir menú"
         >
           <Menu className="w-6 h-6" />
@@ -275,7 +204,7 @@ export function Header({
       {showBack && (
         <button
           onClick={() => navigate(-1)}
-          className="p-2 mr-2 rounded-lg text-secondary hover:text-text hover:bg-gray-100 transition-colors"
+          className="p-2 mr-2 rounded-lg text-white/90 hover:text-white hover:bg-white/20 transition-colors"
           aria-label="Retroceder"
           title="Retroceder"
         >
@@ -284,7 +213,7 @@ export function Header({
       )}
 
       <div className="flex-1 flex items-center justify-between min-w-0">
-        <h1 className="text-base sm:text-xl font-semibold text-text truncate">MatrixFlow Enterprise</h1>
+        <h1 className="text-base sm:text-xl font-semibold text-white truncate">MatrixFlow Enterprise</h1>
         <div className="flex items-center gap-3 sm:gap-4">
           <NotificationBell />
           <OnlineStatus className="hidden sm:flex" />
