@@ -34,7 +34,7 @@ import {
 } from '../hooks/useApi';
 import { useAuth } from '../contexts/useAuth';
 import { useNotice } from '../hooks/useNotice';
-import { innerPercentLabel, darkTooltipStyle, legendFormatter } from '../lib/chartLabels';
+import { innerPercentLabel, darkTooltipStyle, legendFormatter, metaComplianceTooltip } from '../lib/chartLabels';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -297,9 +297,8 @@ export function Reports() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                     <XAxis type="number" tickFormatter={v => `${v}%`} stroke="#64748B" fontSize={12} domain={[0, 120]} />
                     <YAxis dataKey="name" type="category" width={100} stroke="#64748B" fontSize={12} />
-                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }} />
-                    <Bar dataKey="target" name="Meta" fill="#E2E8F0" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="achieved" name="Alcanzado" fill="#2563EB" radius={[0, 4, 4, 0]} />
+                    <Tooltip content={metaComplianceTooltip} />
+                    <Bar dataKey="compliance" name="Cumplimiento %" fill="#22C55E" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

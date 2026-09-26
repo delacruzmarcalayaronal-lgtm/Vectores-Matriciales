@@ -34,3 +34,21 @@ export const darkTooltipStyle = {
 export const legendFormatter = (value: string) => (
   <span style={{ color: '#CBD5E1', fontSize: 12 }}>{value}</span>
 );
+
+export function metaComplianceTooltip(props: {
+  active?: boolean;
+  label?: string | number;
+  payload?: ReadonlyArray<{ payload?: { compliance?: number; target?: number; achieved?: number } }>;
+}): ReactElement | null {
+  const { active, label, payload } = props;
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload ?? {};
+  return (
+    <div style={darkTooltipStyle} className="p-2 text-xs">
+      <p style={{ fontWeight: 600, marginBottom: 4 }}>{String(label ?? '')}</p>
+      <p>Cumplimiento: {Number(p.compliance ?? 0)}%</p>
+      <p>Meta: S/ {Number(p.target ?? 0).toLocaleString()}</p>
+      <p>Alcanzado: S/ {Number(p.achieved ?? 0).toLocaleString()}</p>
+    </div>
+  );
+}

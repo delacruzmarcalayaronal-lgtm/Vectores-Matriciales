@@ -20,7 +20,7 @@ import { useDashboardStats, useSalesByBranch, useSalesByProduct, useTargetCompli
 import { useAuth } from '../contexts/useAuth';
 import { MODULES, MODULE_COLOR_CLASSES } from '../lib/modules';
 import { ROLE_LABELS, ROLE_ICONS, type ModuleKey } from '../lib/permissions';
-import { innerPercentLabel, darkTooltipStyle, legendFormatter } from '../lib/chartLabels';
+import { innerPercentLabel, darkTooltipStyle, legendFormatter, metaComplianceTooltip } from '../lib/chartLabels';
 import {
   BarChart,
   Bar,
@@ -359,16 +359,7 @@ export function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                   <XAxis type="number" tickFormatter={v => `${v}%`} stroke="#64748B" fontSize={12} domain={[0, 120]} />
                   <YAxis dataKey="name" type="category" width={120} stroke="#64748B" fontSize={12} />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      name === 'compliance' ? `${Number(value ?? 0)}%` : Number(value ?? 0).toLocaleString(),
-                      name === 'compliance' ? 'Cumplimiento' : name === 'target' ? 'Meta' : 'Alcanzado'
-                    ]}
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px' }}
-                  />
-                  <Legend />
-                  <Bar dataKey="target" name="Meta" fill="#E2E8F0" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="achieved" name="Alcanzado" fill="#2563EB" radius={[0, 4, 4, 0]} />
+                  <Tooltip content={metaComplianceTooltip} />
                   <Bar dataKey="compliance" name="Cumplimiento %" fill="#22C55E" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
