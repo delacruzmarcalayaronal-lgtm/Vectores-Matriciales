@@ -14,13 +14,15 @@ import {
   ArrowLeft,
   ScanFace,
   Map,
+  Palette,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { OnlineStatus } from './OnlineStatus';
 import { useAuth } from '../../contexts/useAuth';
 import { type ModuleKey } from '../../lib/permissions';
+import { TECH_COLORS, getStoredPrimary, setPrimaryColor } from '../../lib/theme';
 
 interface NavItem {
   label: string;
@@ -73,6 +75,30 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
   const isDesktop = useIsDesktop();
   const [isHovered, setIsHovered] = useState(false);
   const expanded = !isDesktop || isHovered;
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [primary, setPrimaryState] = useState(() => getStoredPrimary());
+  const paletteRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!paletteOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (paletteRef.current && !paletteRef.current.contains(event.target as Node)) setPaletteOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPaletteOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [paletteOpen]);
+
+  const changePrimary = (hex: string) => {
+    setPrimaryState(hex);
+    setPrimaryColor(hex);
+  };
 
   useEffect(() => {
     onExpandedChange?.(expanded);
@@ -164,7 +190,53 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
         {visibleModules.map(renderItem)}
       </nav>
 
-      <div className="p-3 border-t border-white/10">
+      <div className="p-3 border-t border-white/10 relative" ref={paletteRef}>
+        {paletteOpen && (
+          <div
+            className={`absolute z-50 w-60 rounded-xl border border-white/10 bg-[#0F172A] p-3 shadow-2xl ${
+              expanded ? 'bottom-full left-0 mb-2' : 'bottom-1 left-full ml-2'
+            }`}
+          >
+            <p className="text-xs font-semibold text-white/70 mb-2">Color de acento</p>
+            <div className="grid grid-cols-6 gap-2">
+              {TECH_COLORS.map(({ hex, name }) => (
+                <button
+                  key={hex}
+                  type="button"
+                  title={name}
+                  aria-label={`Color ${name}`}
+                  onClick={() => changePrimary(hex)}
+                  className={`w-7 h-7 rounded-full transition-transform hover:scale-110 ${
+                    primary.toLowerCase() === hex.toLowerCase()
+                      ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0F172A]'
+                      : ''
+                  }`}
+                  style={{ backgroundColor: hex }}
+                />
+              ))}
+            </div>
+            <p className="text-[10px] text-white/40 mt-2">Se aplica de inmediato en toda la app.</p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(prev => !prev)}
+          aria-label="Cambiar color de acento"
+          aria-expanded={paletteOpen}
+          title="Cambiar color"
+          className={`w-full flex items-center gap-3 px-3 py-2 mb-1 rounded-lg transition-colors text-secondary hover:text-white hover:bg-white/10 ${
+            expanded ? '' : 'justify-center'
+          }`}
+        >
+          <span className="relative flex-shrink-0">
+            <Palette className="w-5 h-5" />
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0F172A]"
+              style={{ backgroundColor: primary }}
+            />
+          </span>
+          {expanded && <span className="font-medium text-sm">Cambiar color</span>}
+        </button>
         <ProfileAvatar onClick={onNavigate} />
       </div>
     </aside>

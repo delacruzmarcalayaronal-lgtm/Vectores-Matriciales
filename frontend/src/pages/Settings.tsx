@@ -15,7 +15,7 @@ import { Input, Select } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Tabs, TabPanel } from '../components/ui/Table';
 import {
-  type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS
+  type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS, TECH_COLORS
 } from '../lib/theme';
 import { useNotice } from '../hooks/useNotice';
 import {
@@ -56,27 +56,6 @@ const THEME_CARDS: Record<ThemeMode, { label: string; bg: string; surface: strin
   ocean: { label: 'Océano', bg: '#041019', surface: '#14425C', text: '#E0F2FE', border: '#14425C' },
   matrix: { label: 'Matrix', bg: '#030803', surface: '#1B3A21', text: '#DCFCE7', border: '#1B3A21' },
 };
-
-const TECH_COLORS = [
-  { hex: '#2563EB', name: 'Blue' },
-  { hex: '#3B82F6', name: 'Azure' },
-  { hex: '#0EA5E9', name: 'Sky' },
-  { hex: '#06B6D4', name: 'Cyan' },
-  { hex: '#14B8A6', name: 'Teal' },
-  { hex: '#22C55E', name: 'Green' },
-  { hex: '#4ADE80', name: 'Neon' },
-  { hex: '#84CC16', name: 'Lime' },
-  { hex: '#EAB308', name: 'Yellow' },
-  { hex: '#F59E0B', name: 'Amber' },
-  { hex: '#F97316', name: 'Orange' },
-  { hex: '#EF4444', name: 'Red' },
-  { hex: '#F43F5E', name: 'Rose' },
-  { hex: '#EC4899', name: 'Pink' },
-  { hex: '#D946EF', name: 'Fuchsia' },
-  { hex: '#A855F7', name: 'Purple' },
-  { hex: '#8B5CF6', name: 'Violet' },
-  { hex: '#6366F1', name: 'Indigo' },
-];
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('general');

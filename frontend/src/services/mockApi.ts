@@ -100,8 +100,24 @@ const isValidDni = (dni: string) => /^\d{8}$/.test(dni);
 
 const findDemoUser = (dni: string) => DEMO_USERS.find(user => user.dni === dni);
 
+const MOCK_ME_KEY = 'mf_mock_me';
+
+type MockMePatch = { name?: string; role?: Role; avatar?: string | null };
+
+const readMeOverrides = (): Record<string, MockMePatch> => {
+  try { return JSON.parse(localStorage.getItem(MOCK_ME_KEY) || '{}') as Record<string, MockMePatch>; } catch { return {}; }
+};
+
+const writeMeOverrides = (rows: Record<string, MockMePatch>) => localStorage.setItem(MOCK_ME_KEY, JSON.stringify(rows));
+
+const withMeOverride = <T extends { dni?: string; id: string }>(user: T): T => {
+  const patch = readMeOverrides()[user.dni || user.id];
+  if (!patch) return user;
+  return { ...user, ...patch, avatar: patch.avatar ?? undefined };
+};
+
 const buildSession = (dni: string, name: string, role: Role) => ({
-  user: { ...mockUser, id: dni, dni, name, role },
+  user: withMeOverride({ ...mockUser, id: dni, dni, name, role }),
   accessToken: `mock-access-${dni}`,
   refreshToken: `mock-refresh-${dni}`,
 });
@@ -147,14 +163,27 @@ export const mockAuth = {
     const token = localStorage.getItem('accessToken') || '';
     const dni = token.startsWith('mock-access-') ? token.slice('mock-access-'.length) : '';
     const demo = dni ? findDemoUser(dni) : undefined;
-    if (demo) return { ...mockUser, id: dni, dni, name: demo.name, role: demo.role };
+    if (demo) return withMeOverride({ ...mockUser, id: dni, dni, name: demo.name, role: demo.role });
     if (dni) {
       const registered = readRegistered().find(u => u.dni === dni);
       if (registered) {
-        return { ...mockUser, id: dni, dni, name: registered.name, role: registered.role };
+        return withMeOverride({ ...mockUser, id: dni, dni, name: registered.name, role: registered.role });
       }
     }
-    return mockUser;
+    return withMeOverride(mockUser);
+  },
+  updateMe: async (patch: { name?: string; role?: Role; avatar?: string | null }) => {
+    await delay(MOCK_DELAY);
+    const current = await mockAuth.me();
+    const key = current.dni || current.id;
+    const overrides = readMeOverrides();
+    const next: MockMePatch = { ...overrides[key] };
+    if (patch.name !== undefined) next.name = patch.name;
+    if (patch.role !== undefined) next.role = patch.role;
+    if ('avatar' in patch) next.avatar = patch.avatar ?? null;
+    overrides[key] = next;
+    writeMeOverrides(overrides);
+    return withMeOverride(current);
   },
 };
 
@@ -516,5 +545,16 @@ export const mockNotificationsApi = {
     }
     writeNotifState(state);
     return { message: 'Notificaciones marcadas como leídas', count };
+  },
+  dismissAll: async (_companyId: string) => {
+    await delay(MOCK_DELAY);
+    const state = readNotifState();
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const n of readMockNotifs()) {
+      if (!state[n.id]?.dismissedAt) { state[n.id] = { ...state[n.id], dismissedAt: now, readAt: state[n.id]?.readAt || now }; count++; }
+    }
+    writeNotifState(state);
+    return { message: 'Notificaciones descartadas', count };
   },
 };

@@ -9,6 +9,7 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Matrix } from '../types';
 import { matrixSchema, type MatrixForm } from '../schemas';
+import { useNotice } from '../hooks/useNotice';
 
 export function Matrices() {
   const [search, setSearch] = useState('');
@@ -21,6 +22,7 @@ export function Matrices() {
   const [gridValues, setGridValues] = useState<number[][]>([[]]);
   const [gridRowLabels, setGridRowLabels] = useState<string[]>([]);
   const [gridColLabels, setGridColLabels] = useState<string[]>([]);
+  const { show, notice } = useNotice();
 
   const { data: matrices, isLoading, refetch } = useMatrices('1');
   const createMatrix = useCreateMatrix('1');
@@ -177,9 +179,14 @@ export function Matrices() {
     }
   };
 
-  const copyToClipboard = (values: number[][]) => {
+  const copyToClipboard = async (values: number[][]) => {
     const text = values.map(row => row.join('\t')).join('\n');
-    navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+      show('Copiado al portapapeles');
+    } catch {
+      show('No se pudo copiar al portapapeles');
+    }
   };
 
   const downloadMatrix = (matrix: Matrix) => {
@@ -474,6 +481,7 @@ export function Matrices() {
           </Button>
         </div>
       </Modal>
+      {notice}
     </div>
   );
 }

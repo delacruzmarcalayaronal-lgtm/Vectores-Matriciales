@@ -97,23 +97,34 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <div>
+        <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-text">Notificaciones</p>
+              {visible.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => actions.dismissAll()}
+                  className="text-xs text-danger hover:underline flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Borrar todas
+                </button>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
               <p className="text-xs text-secondary">
                 {unread > 0 ? `${unread} sin leer` : 'Todo al día'}
               </p>
+              {unread > 0 && (
+                <button
+                  type="button"
+                  onClick={() => actions.readAll()}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" /> Marcar todas
+                </button>
+              )}
             </div>
-            {unread > 0 && (
-              <button
-                type="button"
-                onClick={() => actions.readAll()}
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                <CheckCheck className="w-3.5 h-3.5" /> Marcar todas
-              </button>
-            )}
           </div>
 
           <div className="max-h-[360px] overflow-y-auto">
@@ -129,7 +140,7 @@ export function NotificationBell() {
                   <div
                     key={n.id}
                     className={`group flex items-start gap-3 px-4 py-3 border-b border-border last:border-0 cursor-pointer transition-colors hover:bg-surface-hover ${
-                      n.isRead ? 'opacity-60' : 'bg-primary/[0.04]'
+                      !n.isRead && 'bg-primary/[0.04]'
                     }`}
                     onClick={() => handleClick(n)}
                   >
@@ -155,9 +166,9 @@ export function NotificationBell() {
                         event.stopPropagation();
                         actions.dismiss(n.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-secondary hover:text-danger transition-opacity flex-shrink-0"
+                      className="p-1.5 rounded-md text-secondary hover:text-danger hover:bg-danger/10 transition-colors flex-shrink-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 );

@@ -480,6 +480,7 @@ export function useNotificationActions(companyId: string) {
     read: (id: string) => api.notifications.read(id).then(r => { invalidate(); return r; }),
     dismiss: (id: string) => api.notifications.dismiss(id).then(r => { invalidate(); return r; }),
     readAll: () => api.notifications.readAll(companyId).then(r => { invalidate(); return r; }),
+    dismissAll: () => api.notifications.dismissAll(companyId).then(r => { invalidate(); return r; }),
     create: (data: NotificationInput) => api.notifications.create(companyId, data).then(r => { invalidate(); return r; }),
   };
 }

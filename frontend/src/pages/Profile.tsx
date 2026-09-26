@@ -169,7 +169,14 @@ export function Profile() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Nombre completo" value={name} onChange={e => { setName(e.target.value); setSaved(false); }} placeholder="Tu nombre" />
-            <Select label="Rol" value={role} onChange={e => { setRole(e.target.value as Role); setSaved(false); }} options={roleOptions} />
+            <Select
+              label="Rol"
+              value={role}
+              onChange={e => { setRole(e.target.value as Role); setSaved(false); }}
+              options={roleOptions}
+              disabled={user.role !== 'admin'}
+              title={user.role !== 'admin' ? 'Solo un administrador puede cambiar el rol' : undefined}
+            />
             <Input label="DNI" value={user.dni || '—'} readOnly disabled className="font-mono" />
           </div>
 
@@ -178,12 +185,12 @@ export function Profile() {
           )}
           {saved && (
             <p className="text-sm text-success bg-success/5 border border-success/20 rounded-lg px-3 py-2 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" /> Cambios guardados en este navegador
+              <CheckCircle2 className="w-4 h-4" /> Cambios guardados en tu cuenta
             </p>
           )}
 
           <p className="text-xs text-secondary">
-            Demostración frontend: la foto se recorta a 192 px y tu perfil se guarda solo en este navegador.
+            Tu foto se recorta a 192 px y se guarda en tu cuenta: la verás desde cualquier dispositivo.
           </p>
         </CardContent>
 

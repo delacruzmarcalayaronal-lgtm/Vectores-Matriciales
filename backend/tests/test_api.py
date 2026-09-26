@@ -158,3 +158,66 @@ class TestAuditAndReports:
         body = r.json()
         assert isinstance(body["data"], list)
         assert body["total"] >= 15
+
+
+class TestPerfilYNotificaciones:
+    def test_update_me_persiste_foto_y_nombre(self, client, admin_token):
+        r = client.put(
+            f"{API}/auth/me",
+            headers=_auth(admin_token),
+            json={"name": "Admin Editado", "avatar": "data:image/jpeg;base64,AAAA"},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["name"] == "Admin Editado"
+        assert body["avatar"].startswith("data:image/")
+
+        r2 = client.get(f"{API}/auth/me", headers=_auth(admin_token))
+        assert r2.status_code == 200
+        assert r2.json()["name"] == "Admin Editado"
+        assert r2.json()["avatar"]
+
+    def test_update_me_borra_foto_con_null(self, client, admin_token):
+        r = client.put(
+            f"{API}/auth/me", headers=_auth(admin_token), json={"avatar": None}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["avatar"] is None
+
+    def test_update_me_rol_solo_admin(self, client, operator_token):
+        r = client.put(
+            f"{API}/auth/me", headers=_auth(operator_token), json={"role": "admin"}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["role"] == "operator"
+
+    def test_update_me_foto_invalida_400(self, client, admin_token):
+        r = client.put(
+            f"{API}/auth/me", headers=_auth(admin_token), json={"avatar": "no-es-imagen"}
+        )
+        assert r.status_code == 400
+
+    def test_notifications_dismiss_all(self, client, admin_token):
+        for i in range(2):
+            r = client.post(
+                f"{API}/companies/1/notifications",
+                headers=_auth(admin_token),
+                json={
+                    "type": "system",
+                    "title": f"TmpDismiss {i}",
+                    "message": "temporal",
+                    "link": "/dashboard",
+                    "dedupKey": f"tmp-dismiss-{i}",
+                },
+            )
+            assert r.status_code == 201, r.text
+
+        r = client.post(
+            f"{API}/companies/1/notifications/dismiss-all", headers=_auth(admin_token)
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["count"] >= 2
+
+        r = client.get(f"{API}/companies/1/notifications", headers=_auth(admin_token))
+        titles = [n["title"] for n in r.json()]
+        assert not any(t.startswith("TmpDismiss") for t in titles)

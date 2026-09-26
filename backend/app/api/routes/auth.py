@@ -8,7 +8,7 @@ from ...core.deps import get_current_user, get_current_user_optional
 from ...core.security import create_access_token, create_refresh_token, decode_token, JWTError
 from ...db import get_db
 from ...models import Company, User
-from ...schemas import AuthResponse, LoginFaceIn, LoginIn, RefreshIn, RegisterIn, UserOut
+from ...schemas import AuthResponse, LoginFaceIn, LoginIn, MeUpdate, RefreshIn, RegisterIn, UserOut
 from ...services.audit import record_audit
 from ..helpers import new_id
 
@@ -119,6 +119,44 @@ def logout(
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> UserOut:
+    return UserOut.model_validate(user)
+
+
+@router.put("/me", response_model=UserOut)
+def update_me(
+    body: MeUpdate,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    changes: dict = {}
+    if body.name is not None:
+        name = body.name.strip()
+        if len(name) < 2:
+            raise HTTPException(status_code=400, detail="El nombre debe tener al menos 2 caracteres")
+        if name != user.name:
+            changes["name"] = name
+            user.name = name
+    # el rol solo lo puede cambiar un administrador
+    if body.role is not None and body.role != user.role and user.role == "admin":
+        changes["role"] = body.role
+        user.role = body.role
+    # "avatar" distingue entre no enviado (ausente) y borrado (null)
+    if "avatar" in body.model_fields_set:
+        if body.avatar is not None and not body.avatar.startswith("data:image/"):
+            raise HTTPException(status_code=400, detail="La foto debe ser una imagen válida")
+        if body.avatar is not None and len(body.avatar) > 500_000:
+            raise HTTPException(status_code=400, detail="La imagen es demasiado grande (máx. 500 KB)")
+        if (user.avatar or None) != (body.avatar or None):
+            changes["avatar"] = body.avatar
+            user.avatar = body.avatar
+    if changes:
+        record_audit(
+            db, user, action="update_profile", module="usuarios",
+            entity_type="user", entity_id=user.id, new_values=changes, request=request,
+        )
+        db.commit()
+        db.refresh(user)
     return UserOut.model_validate(user)
 
 

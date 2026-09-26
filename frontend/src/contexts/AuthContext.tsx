@@ -18,7 +18,12 @@ const readProfiles = (): Record<string, ProfilePatch> => {
   }
 };
 
-const applyProfile = (target: User): User => ({ ...target, ...(readProfiles()[target.id] || {}) });
+const applyProfile = (target: User): User => {
+  // el servidor es la fuente de verdad (nombre, rol, foto); el respaldo local
+  // solo aporta la foto si el servidor aún no tiene una guardada
+  const patch = readProfiles()[target.id] || {};
+  return { ...target, avatar: target.avatar ?? patch.avatar ?? undefined };
+};
 
 const toMessage = (error: unknown, fallback: string) => {
   if (axios.isAxiosError(error)) {
@@ -108,14 +113,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = async (patch: ProfilePatch) => {
     if (!user) throw new Error('No hay una sesión activa');
-    const profiles = readProfiles();
-    profiles[user.id] = { ...profiles[user.id], ...patch };
+    // persiste en el servidor (foto, nombre y rol viajan en la cuenta)
+    let updated: User;
     try {
+      const payload: { name?: string; role?: User['role']; avatar?: string | null } = {
+        name: patch.name,
+        role: patch.role,
+      };
+      if ('avatar' in patch) payload.avatar = patch.avatar ?? null;
+      updated = USE_MOCK ? await mockAuth.updateMe(payload) : await authApi.updateMe(payload);
+    } catch (error) {
+      throw new Error(toMessage(error, 'No se pudo guardar el perfil en el servidor'));
+    }
+    // respaldo local (compatibilidad con fotos antiguas)
+    try {
+      const profiles = readProfiles();
+      profiles[user.id] = {
+        name: updated.name,
+        role: updated.role,
+        avatar: updated.avatar ?? undefined,
+      };
       localStorage.setItem(PROFILE_KEY, JSON.stringify(profiles));
     } catch {
-      throw new Error('No se pudo guardar: el almacenamiento del navegador está lleno');
+      // almacenamiento lleno: el cambio ya quedó guardado en el servidor
     }
-    setUser(prev => (prev ? { ...prev, ...patch } : prev));
+    setUser(prev => (prev ? { ...prev, ...updated } : updated));
   };
 
   const canModule = (module: ModuleKey) => can(user?.role, module);

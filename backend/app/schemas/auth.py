@@ -59,3 +59,9 @@ class UserUpdate(BaseModel):
     avatar: str | None = None
     isActive: bool | None = None
     password: str | None = None
+
+
+class MeUpdate(BaseModel):
+    name: str | None = None
+    role: Role | None = None
+    avatar: str | None = None

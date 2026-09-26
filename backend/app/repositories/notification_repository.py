@@ -121,3 +121,33 @@ class NotificationRepository:
                 row.readAt = utcnow()
                 count += 1
         return count
+
+    def dismiss_all(self, company_id: str, user_id: str) -> int:
+        notifications = self.db.scalars(
+            select(Notification)
+            .where(Notification.companyId == company_id)
+            .where((Notification.userId.is_(None)) | (Notification.userId == user_id))
+        ).all()
+        count = 0
+        for n in notifications:
+            row = self.db.scalar(
+                select(NotificationRead)
+                .where(NotificationRead.notificationId == n.id)
+                .where(NotificationRead.userId == user_id)
+            )
+            if row is None:
+                row = NotificationRead(
+                    id=new_id(),
+                    notificationId=n.id,
+                    userId=user_id,
+                    readAt=utcnow(),
+                    dismissedAt=utcnow(),
+                )
+                self.db.add(row)
+                count += 1
+            elif row.dismissedAt is None:
+                row.dismissedAt = utcnow()
+                if row.readAt is None:
+                    row.readAt = utcnow()
+                count += 1
+        return count

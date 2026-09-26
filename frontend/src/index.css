@@ -12,6 +12,8 @@
   --color-danger: #EF4444;
   --color-success: #22C55E;
   --color-warning: #F59E0B;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F1F5F9;
 }
 
 @layer base {
@@ -52,6 +54,8 @@ html.dark {
   --surface-3: #131C2E;
   --surface-4: #0F172A;
   --surface-hover: #27354C;
+  --color-surface: var(--surface-1);
+  --color-surface-hover: var(--surface-hover);
   --sidebar-gradient: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
   --tw-ring-offset-color: var(--color-bg);
 }
@@ -184,7 +188,7 @@ html.dark.theme-matrix {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  /* Un gráfico por hoja, centrado y sin desbordes */
+  /* Un gráfico por hoja, centrado en la hoja y sin desbordes */
   #report-print .print-charts-grid {
     display: block !important;
   }
@@ -199,10 +203,26 @@ html.dark.theme-matrix {
     margin-right: auto !important;
     margin-bottom: 16px;
     overflow: hidden;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    min-height: calc(100vh - 32px);
   }
   #report-print .print-chart-page:last-child {
     break-after: auto;
     page-break-after: auto;
+  }
+  /* el gráfico llena el ancho de la tarjeta y ocupa casi toda la hoja */
+  #report-print .print-chart-page .report-chart {
+    height: calc(100vh - 300px) !important;
+  }
+  #report-print .print-chart-page .recharts-responsive-container {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  #report-print .print-chart-page svg.recharts-surface {
+    width: 100% !important;
+    height: auto !important;
   }
   .recharts-tooltip-wrapper {
     display: none !important;

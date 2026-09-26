@@ -140,6 +140,8 @@ export const authApi = {
     unwrap(api.post<AuthResponse>('/auth/register', credentials)),
   logout: () => unwrap(api.post<void>('/auth/logout')),
   me: () => unwrap(api.get<User>('/auth/me')),
+  updateMe: (data: { name?: string; role?: string; avatar?: string | null }) =>
+    unwrap(api.put<User>('/auth/me', data)).then(user => ({ ...user, avatar: user.avatar ?? undefined })),
   refresh: (token: string) => unwrap(api.post<AuthResponse>('/auth/refresh', { refreshToken: token })),
 };
 
@@ -288,6 +290,8 @@ export const notificationsApi = {
   dismiss: (id: string) => unwrap(api.post<{ message: string }>(`/notifications/${id}/dismiss`)),
   readAll: (companyId: string) =>
     unwrap(api.post<{ message: string; count: number }>(`/companies/${companyId}/notifications/read-all`)),
+  dismissAll: (companyId: string) =>
+    unwrap(api.post<{ message: string; count: number }>(`/companies/${companyId}/notifications/dismiss-all`)),
 };
 
 const HEALTH_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '') + '/health';

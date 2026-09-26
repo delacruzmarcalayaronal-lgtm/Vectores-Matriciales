@@ -270,7 +270,7 @@ export function Reports() {
               <CardTitle>Ventas por Sucursal</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
+              <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={branchChartData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
@@ -291,7 +291,7 @@ export function Reports() {
               <CardTitle>Top Productos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
+              <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={productChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="revenue" nameKey="name" label={innerPercentLabel} labelLine={false}>
@@ -310,7 +310,7 @@ export function Reports() {
               <CardTitle>Cumplimiento de Metas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
+              <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={complianceData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
@@ -329,7 +329,7 @@ export function Reports() {
               <CardTitle>Rotación de Inventario</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
+              <div className="h-[520px] report-chart">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={rotationData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />

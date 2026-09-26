@@ -8,6 +8,27 @@ const PRESET_DARK_CLASSES = ['theme-midnight', 'theme-ocean', 'theme-matrix'];
 
 export const THEME_OPTIONS: ThemeMode[] = ['light', 'dark', 'system', 'midnight', 'ocean', 'matrix'];
 
+export const TECH_COLORS = [
+  { hex: '#2563EB', name: 'Blue' },
+  { hex: '#3B82F6', name: 'Azure' },
+  { hex: '#0EA5E9', name: 'Sky' },
+  { hex: '#06B6D4', name: 'Cyan' },
+  { hex: '#14B8A6', name: 'Teal' },
+  { hex: '#22C55E', name: 'Green' },
+  { hex: '#4ADE80', name: 'Neon' },
+  { hex: '#84CC16', name: 'Lime' },
+  { hex: '#EAB308', name: 'Yellow' },
+  { hex: '#F59E0B', name: 'Amber' },
+  { hex: '#F97316', name: 'Orange' },
+  { hex: '#EF4444', name: 'Red' },
+  { hex: '#F43F5E', name: 'Rose' },
+  { hex: '#EC4899', name: 'Pink' },
+  { hex: '#D946EF', name: 'Fuchsia' },
+  { hex: '#A855F7', name: 'Purple' },
+  { hex: '#8B5CF6', name: 'Violet' },
+  { hex: '#6366F1', name: 'Indigo' },
+];
+
 export function getStoredTheme(): ThemeMode {
   const value = localStorage.getItem(THEME_KEY);
   return (THEME_OPTIONS as string[]).includes(value ?? '')

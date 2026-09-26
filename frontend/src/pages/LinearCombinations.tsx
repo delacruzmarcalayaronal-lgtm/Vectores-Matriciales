@@ -104,9 +104,14 @@ export function LinearCombinations() {
 
   const resultVector = getResultVector();
 
-  const copyResult = () => {
+  const copyResult = async () => {
     if (resultVector) {
-      navigator.clipboard.writeText(resultVector.join(', '));
+      try {
+        await navigator.clipboard.writeText(resultVector.join(', '));
+        show('Copiado al portapapeles');
+      } catch {
+        show('No se pudo copiar al portapapeles');
+      }
     }
   };
 

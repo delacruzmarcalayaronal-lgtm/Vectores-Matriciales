@@ -87,3 +87,16 @@ def read_all(
     count = repo.read_all(company_id, user.id)
     db.commit()
     return {"message": "Notificaciones marcadas como leídas", "count": count}
+
+
+@router.post("/companies/{company_id}/notifications/dismiss-all", response_model=dict)
+def dismiss_all(
+    company_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_company(user, company_id)
+    repo = NotificationRepository(db)
+    count = repo.dismiss_all(company_id, user.id)
+    db.commit()
+    return {"message": "Notificaciones descartadas", "count": count}

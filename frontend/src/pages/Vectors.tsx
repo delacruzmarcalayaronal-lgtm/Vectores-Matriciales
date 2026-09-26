@@ -9,6 +9,7 @@ import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Vector } from '../types';
 import { vectorSchema, type VectorForm } from '../schemas';
+import { useNotice } from '../hooks/useNotice';
 
 export function Vectors() {
   const [search, setSearch] = useState('');
@@ -17,6 +18,7 @@ export function Vectors() {
   const [viewingVector, setViewingVector] = useState<Vector | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [valuesInput, setValuesInput] = useState('');
+  const { show, notice } = useNotice();
 
   const { data: vectors, isLoading, refetch } = useVectors('1');
   const createVector = useCreateVector('1');
@@ -104,8 +106,13 @@ export function Vectors() {
     }
   };
 
-  const copyToClipboard = (values: number[]) => {
-    navigator.clipboard.writeText(values.join(', '));
+  const copyToClipboard = async (values: number[]) => {
+    try {
+      await navigator.clipboard.writeText(values.join(', '));
+      show('Copiado al portapapeles');
+    } catch {
+      show('No se pudo copiar al portapapeles');
+    }
   };
 
   const downloadVector = (vector: Vector) => {
@@ -307,6 +314,7 @@ export function Vectors() {
           </Button>
         </div>
       </Modal>
+      {notice}
     </div>
   );
 }
