@@ -18,6 +18,10 @@ class UserOut(BaseModel):
     companyId: str
     createdAt: str
     updatedAt: str
+    faceRegistered: bool = False
+    facePoints: int | None = None
+    faceThreshold: int | None = None
+    faceRegisteredAt: str | None = None
 
 
 class UserCreate(BaseModel):

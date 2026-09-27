@@ -1,5 +1,14 @@
 from .audit import AuditLogOut
-from .auth import AuthResponse, LoginFaceIn, LoginIn, RefreshIn, RegisterIn
+from .auth import (
+    AuthResponse,
+    FaceSaveIn,
+    FaceVerifyIn,
+    FaceVerifyOut,
+    LoginFaceIn,
+    LoginIn,
+    RefreshIn,
+    RegisterIn,
+)
 from .base import Page
 from .branch import BranchOut, BranchUpsert
 from .category import CategoryOut, CategoryUpsert
@@ -41,6 +50,9 @@ __all__ = [
     "ConsentCreate",
     "ConsentResponse",
     "DashboardStatsOut",
+    "FaceSaveIn",
+    "FaceVerifyIn",
+    "FaceVerifyOut",
     "InventoryMovementOut",
     "InventoryMovementUpsert",
     "InventoryRotationOut",

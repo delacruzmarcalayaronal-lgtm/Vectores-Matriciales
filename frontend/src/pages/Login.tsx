@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Calculator, IdCard, Loader2, ShieldCheck, AlertCircle, UserPlus, LogIn, Grid3x3, BarChart3, Lock, ScanFace } from 'lucide-react';
-import { FaceScanner } from '../components/auth/FaceScanner';
+import { FaceScanner, type FaceScanResult } from '../components/auth/FaceScanner';
 import { SmokeField } from '../components/auth/SmokeField';
 import { useAuth } from '../contexts/useAuth';
 import { DEMO_USERS } from '../services/mockApi';
@@ -19,7 +19,7 @@ export function Login() {
   const [method, setMethod] = useState<LoginMethod>('dni');
   const [dni, setDni] = useState('');
   const [name, setName] = useState('');
-  const [faceVerified, setFaceVerified] = useState(false);
+  const [faceScan, setFaceScan] = useState<FaceScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [bgMotion, setBgMotion] = useState(readBgMotion);
@@ -39,7 +39,7 @@ export function Login() {
   const showScanner = mode === 'register' || method === 'face';
   const dniRequired = mode === 'register' || method === 'dni';
   const dniOk = dniRequired ? dniValid : dni === '' || dniValid;
-  const faceOk = !showScanner || faceVerified;
+  const faceOk = !showScanner || !!faceScan;
   const canSubmit = dniOk && nameValid && faceOk && !isLoading;
 
   if (!authLoading && isAuthenticated) {
@@ -49,21 +49,19 @@ export function Login() {
   const switchMode = (next: AuthMode) => {
     setMode(next);
     setError(null);
-    setFaceVerified(false);
+    setFaceScan(null);
   };
 
   const switchMethod = (next: LoginMethod) => {
     if (method === next) return;
     setMethod(next);
     setError(null);
-    setFaceVerified(false);
+    setFaceScan(null);
   };
 
   const handleDniChange = (value: string) => {
     setDni(value.replace(/\D/g, '').slice(0, 8));
     setError(null);
-    if (!faceVerified) return;
-    setFaceVerified(false);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -86,11 +84,11 @@ export function Login() {
     setIsLoading(true);
     try {
       if (mode === 'register') {
-        await register(name.trim(), dni);
+        await register(name.trim(), dni, faceScan?.vector ?? null, faceScan?.points ?? null);
       } else if (method === 'dni') {
         await login(dni);
       } else {
-        await loginWithFace(dni || undefined);
+        await loginWithFace(dni || undefined, faceScan?.vector ?? undefined);
       }
       navigate('/dashboard', { replace: true });
     } catch (err) {
@@ -286,8 +284,8 @@ export function Login() {
                   </label>
                   <FaceScanner
                     disabled={dniRequired && !dniValid}
-                    onVerified={() => { setFaceVerified(true); setError(null); }}
-                    onReset={() => setFaceVerified(false)}
+                    onVerified={result => { setFaceScan(result); setError(null); }}
+                    onReset={() => setFaceScan(null)}
                   />
                   {dniRequired && !dniValid && (
                     <p className="text-xs text-secondary mt-1.5">

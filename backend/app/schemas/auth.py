@@ -17,11 +17,34 @@ class LoginIn(BaseModel):
 
 class LoginFaceIn(BaseModel):
     dni: str | None = None
+    faceVector: list[float] | None = None
 
 
 class RegisterIn(BaseModel):
     dni: str
     name: str
+    faceVector: list[float] | None = None
+    facePoints: int | None = None
+
+
+class FaceSaveIn(BaseModel):
+    vector: list[float]
+    points: int | None = None
+    threshold: int | None = None
+
+
+class FaceVerifyIn(BaseModel):
+    vector: list[float]
+    threshold: int | None = None
+
+
+class FaceVerifyOut(BaseModel):
+    ok: bool
+    score: float
+    threshold: int
+    points: int | None = None
+    registered: bool = False
+    user: UserOut | None = None
 
 
 class RefreshIn(BaseModel):

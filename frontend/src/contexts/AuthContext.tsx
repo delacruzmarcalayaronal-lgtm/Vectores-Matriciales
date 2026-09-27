@@ -83,11 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithFace = async (dni?: string) => {
+  const loginWithFace = async (dni?: string, faceVector?: number[]) => {
     try {
       const data = USE_MOCK
         ? await mockAuth.loginWithFace({ dni })
-        : await authApi.loginWithFace({ dni });
+        : await authApi.loginWithFace({ dni, faceVector });
       applySession(data);
       setIsLoading(false);
     } catch (error) {
@@ -95,11 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (name: string, dni: string) => {
+  const register = async (name: string, dni: string, faceVector?: number[] | null, facePoints?: number | null) => {
     try {
       const data = USE_MOCK
         ? await mockAuth.register({ name, dni })
-        : await authApi.register({ name, dni });
+        : await authApi.register({ name, dni, faceVector: faceVector ?? undefined, facePoints: facePoints ?? undefined });
       applySession(data);
       setIsLoading(false);
     } catch (error) {

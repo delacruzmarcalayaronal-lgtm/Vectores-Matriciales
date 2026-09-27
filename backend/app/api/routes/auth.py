@@ -7,7 +7,18 @@ from sqlalchemy.orm import Session
 from ...core.deps import get_current_user, get_current_user_optional
 from ...core.database import get_db
 from ...models import User
-from ...schemas import AuthResponse, LoginFaceIn, LoginIn, MeUpdate, RefreshIn, RegisterIn, UserOut
+from ...schemas import (
+    AuthResponse,
+    FaceSaveIn,
+    FaceVerifyIn,
+    FaceVerifyOut,
+    LoginFaceIn,
+    LoginIn,
+    MeUpdate,
+    RefreshIn,
+    RegisterIn,
+    UserOut,
+)
 from ...services import auth_service
 from ...services.audit import record_audit
 
@@ -24,14 +35,49 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)) -> Aut
 def login_with_face(
     body: LoginFaceIn, request: Request, db: Session = Depends(get_db)
 ) -> AuthResponse:
-    user = auth_service.login_with_face(db, body.dni, request)
+    user = auth_service.login_with_face(db, body.dni, body.faceVector, request)
     return auth_service.auth_response(user)
 
 
 @router.post("/register", response_model=AuthResponse)
 def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    user = auth_service.register_user(db, body.dni, body.name, request)
+    user = auth_service.register_user(
+        db, body.dni, body.name, request,
+        face_vector=body.faceVector, face_points=body.facePoints,
+    )
     return auth_service.auth_response(user)
+
+
+@router.post("/face", response_model=UserOut)
+def save_face(
+    body: FaceSaveIn,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    updated = auth_service.save_face_template(
+        db, user, body.vector, body.points, body.threshold, request
+    )
+    return UserOut.model_validate(updated)
+
+
+@router.delete("/face", response_model=UserOut)
+def delete_face(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    updated = auth_service.delete_face_template(db, user, request)
+    return UserOut.model_validate(updated)
+
+
+@router.post("/face/verify", response_model=FaceVerifyOut)
+def verify_face(
+    body: FaceVerifyIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> FaceVerifyOut:
+    return auth_service.verify_face_template(db, user, body.vector, body.threshold)
 
 
 @router.post("/logout")

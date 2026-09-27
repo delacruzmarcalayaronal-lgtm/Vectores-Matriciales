@@ -9,6 +9,10 @@ export interface User {
   companyId: string;
   createdAt: string;
   updatedAt: string;
+  faceRegistered?: boolean;
+  facePoints?: number | null;
+  faceThreshold?: number | null;
+  faceRegisteredAt?: string | null;
 }
 
 export interface Company {

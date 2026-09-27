@@ -29,6 +29,28 @@ export const TECH_COLORS = [
   { hex: '#6366F1', name: 'Indigo' },
 ];
 
+export const TECH_COLORS_DARK = [
+  { hex: '#1E3A8A', name: 'Navy' },
+  { hex: '#075985', name: 'DeepSky' },
+  { hex: '#155E75', name: 'Ocean' },
+  { hex: '#134E4A', name: 'DeepTeal' },
+  { hex: '#14532D', name: 'Forest' },
+  { hex: '#3F6212', name: 'Moss' },
+  { hex: '#92400E', name: 'Umber' },
+  { hex: '#9A3412', name: 'Rust' },
+  { hex: '#991B1B', name: 'Crimson' },
+  { hex: '#9F1239', name: 'Rosewood' },
+  { hex: '#6B21A8', name: 'Grape' },
+  { hex: '#4C1D95', name: 'Iris' },
+  { hex: '#3730A3', name: 'Indigo Dark' },
+  { hex: '#1F2937', name: 'Graphite' },
+];
+
+export const TECH_COLOR_GROUPS: Array<{ title: string; colors: typeof TECH_COLORS }> = [
+  { title: 'Colores vivos', colors: TECH_COLORS },
+  { title: 'Colores oscuros', colors: TECH_COLORS_DARK },
+];
+
 export function getStoredTheme(): ThemeMode {
   const value = localStorage.getItem(THEME_KEY);
   return (THEME_OPTIONS as string[]).includes(value ?? '')

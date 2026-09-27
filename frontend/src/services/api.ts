@@ -131,18 +131,32 @@ api.interceptors.response.use(
 
 const unwrap = <T>(promise: Promise<{ data: T }>): Promise<T> => promise.then((res) => res.data);
 
+export interface FaceVerifyResult {
+  ok: boolean;
+  score: number;
+  threshold: number;
+  points?: number | null;
+  registered?: boolean;
+  user?: User | null;
+}
+
 export const authApi = {
   login: (credentials: { dni: string }) =>
     unwrap(api.post<AuthResponse>('/auth/login', credentials)),
-  loginWithFace: (credentials: { dni?: string }) =>
+  loginWithFace: (credentials: { dni?: string; faceVector?: number[] }) =>
     unwrap(api.post<AuthResponse>('/auth/login/face', credentials)),
-  register: (credentials: { dni: string; name: string }) =>
+  register: (credentials: { dni: string; name: string; faceVector?: number[] | null; facePoints?: number | null }) =>
     unwrap(api.post<AuthResponse>('/auth/register', credentials)),
   logout: () => unwrap(api.post<void>('/auth/logout')),
   me: () => unwrap(api.get<User>('/auth/me')),
   updateMe: (data: { name?: string; role?: string; avatar?: string | null }) =>
     unwrap(api.put<User>('/auth/me', data)).then(user => ({ ...user, avatar: user.avatar ?? undefined })),
   refresh: (token: string) => unwrap(api.post<AuthResponse>('/auth/refresh', { refreshToken: token })),
+  saveFace: (data: { vector: number[]; points?: number; threshold?: number }) =>
+    unwrap(api.post<User>('/auth/face', data)),
+  deleteFace: () => unwrap(api.delete<User>('/auth/face')),
+  verifyFace: (data: { vector: number[]; threshold?: number }) =>
+    unwrap(api.post<FaceVerifyResult>('/auth/face/verify', data)),
 };
 
 export const companiesApi = {

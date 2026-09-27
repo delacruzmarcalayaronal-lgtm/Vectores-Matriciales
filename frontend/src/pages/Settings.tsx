@@ -15,7 +15,7 @@ import { Input, Select } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Tabs, TabPanel } from '../components/ui/Table';
 import {
-  type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS, TECH_COLORS
+  type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS, TECH_COLOR_GROUPS
 } from '../lib/theme';
 import { useNotice } from '../hooks/useNotice';
 import {
@@ -523,23 +523,30 @@ export function Settings() {
             </div>
             <div>
               <label className="block text-sm font-medium text-text mb-3">Color de acento</label>
-              <div className="flex flex-wrap items-center gap-3">
-                {TECH_COLORS.map(({ hex, name }) => (
-                  <label key={hex} className="relative cursor-pointer" title={name}>
-                    <input
-                      type="radio"
-                      name="primaryColor"
-                      value={hex}
-                      checked={primaryColor === hex}
-                      onChange={() => handlePrimary(hex)}
-                      className="sr-only peer"
-                    />
-                    <div
-                      className="w-10 h-10 rounded-full border-2 border-white/30 transition-transform peer-checked:scale-110 peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-primary"
-                      style={{ backgroundColor: hex }}
-                    />
-                    <span className="block text-[10px] text-secondary mt-1 text-center">{name}</span>
-                  </label>
+              <div className="space-y-4">
+                {TECH_COLOR_GROUPS.map(group => (
+                  <div key={group.title}>
+                    <p className="text-xs text-secondary mb-2">{group.title}</p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {group.colors.map(({ hex, name }) => (
+                        <label key={hex} className="relative cursor-pointer" title={name}>
+                          <input
+                            type="radio"
+                            name="primaryColor"
+                            value={hex}
+                            checked={primaryColor === hex}
+                            onChange={() => handlePrimary(hex)}
+                            className="sr-only peer"
+                          />
+                          <div
+                            className="w-10 h-10 rounded-full border-2 border-white/30 transition-transform peer-checked:scale-110 peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-primary"
+                            style={{ backgroundColor: hex }}
+                          />
+                          <span className="block text-[10px] text-secondary mt-1 text-center">{name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
               <p className="text-xs text-secondary mt-3">Se aplica de inmediato en los botones, la cabecera y toda la interfaz; queda guardado en este navegador.</p>

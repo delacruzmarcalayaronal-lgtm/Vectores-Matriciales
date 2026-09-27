@@ -22,10 +22,18 @@ import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Table';
 import { useAuth } from '../contexts/useAuth';
 import { ROLE_LABELS, ROLE_ICONS } from '../lib/permissions';
-
-const MAX_SAMPLES = 3;
-const TEMPLATE_KEY = 'mf_face_template';
-const REGISTERED_KEY = 'mf_face_registered_at';
+import { authApi } from '../services/api';
+import {
+  buildDescriptor,
+  clampThreshold,
+  detectFace,
+  drawFaceOverlay,
+  GEOM_POINTS,
+  MAX_THRESHOLD,
+  MIN_THRESHOLD,
+  type FaceHit,
+  type FaceSource,
+} from '../lib/face';
 
 const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -43,42 +51,6 @@ const toDataUrl = (source: CanvasImageSource, width: number, height: number): st
   if (!ctx) return '';
   ctx.drawImage(source, 0, 0, width, height);
   return canvas.toDataURL('image/jpeg', 0.85);
-};
-
-const featureVector = async (dataUrl: string): Promise<number[] | null> => {
-  try {
-    const image = await loadImage(dataUrl);
-    const size = 24;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(image, 0, 0, size, size);
-    const { data } = ctx.getImageData(0, 0, size, size);
-    const vector: number[] = [];
-    for (let i = 0; i < data.length; i += 4) {
-      vector.push((0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255);
-    }
-    return vector;
-  } catch {
-    return null;
-  }
-};
-
-const similarity = async (a: string, b: string): Promise<number> => {
-  const [va, vb] = await Promise.all([featureVector(a), featureVector(b)]);
-  if (!va || !vb || va.length !== vb.length) return 0;
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  for (let i = 0; i < va.length; i += 1) {
-    dot += va[i] * vb[i];
-    na += va[i] * va[i];
-    nb += vb[i] * vb[i];
-  }
-  if (na === 0 || nb === 0) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 };
 
 interface Quality {
@@ -149,35 +121,36 @@ const Slider = ({ label, value, min, max, suffix, icon, onChange }: SliderProps)
   </div>
 );
 
+const errorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const data = (error as { response?: { data?: { message?: string; detail?: string } } }).response?.data;
+    return data?.message || data?.detail || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+};
+
 export function Identity() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const liveHitRef = useRef<FaceHit | null>(null);
 
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [probeSource, setProbeSource] = useState<string | undefined>(undefined);
-  const [samples, setSamples] = useState<string[]>([]);
-  const [template, setTemplate] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(TEMPLATE_KEY);
-    } catch {
-      return null;
-    }
-  });
-  const [registeredAt, setRegisteredAt] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(REGISTERED_KEY);
-    } catch {
-      return null;
-    }
-  });
-  const [result, setResult] = useState<{ ok: boolean; score: number } | null>(null);
+  const [sample, setSample] = useState<string | null>(null);
+  const [descriptor, setDescriptor] = useState<number[] | null>(null);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [scanMsg, setScanMsg] = useState('');
+  const [captureMsg, setCaptureMsg] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+  const [result, setResult] = useState<{ ok: boolean; score: number; threshold: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => new Date());
-  const [threshold, setThreshold] = useState(90);
+  const [threshold, setThreshold] = useState(() => clampThreshold(user?.faceThreshold));
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [zoom, setZoom] = useState(100);
@@ -188,6 +161,8 @@ export function Identity() {
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
     setCameraOn(false);
+    liveHitRef.current = null;
+    setFaceDetected(false);
   }, []);
 
   useEffect(() => {
@@ -206,7 +181,7 @@ export function Identity() {
     setCameraError('');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 320, height: 240 },
+        video: { facingMode: 'user', width: 640, height: 480 },
         audio: false,
       });
       streamRef.current = stream;
@@ -216,44 +191,20 @@ export function Identity() {
       }
       setCameraOn(true);
     } catch {
-      setCameraError('Cámara no disponible (sin permiso o sin dispositivo). Usa una foto o el modo demostración.');
+      setCameraError('Cámara no disponible (sin permiso o sin dispositivo). Usa una foto.');
       setCameraOn(false);
     } finally {
       setRequesting(false);
     }
   };
 
-  const syntheticSample = (): string => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 320;
-    canvas.height = 240;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-    const seed = [...(user?.dni || '00000000')].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    const gradient = ctx.createLinearGradient(0, 0, 320, 240);
-    gradient.addColorStop(0, `hsl(${seed % 360}, 65%, 32%)`);
-    gradient.addColorStop(1, `hsl(${(seed + 60) % 360}, 70%, 68%)`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 320, 240);
-    let rand = (seed * 9301 + 49297) % 233280;
-    const nextRand = () => {
-      rand = (rand * 9301 + 49297) % 233280;
-      return rand / 233280;
-    };
-    for (let i = 0; i < 1200; i += 1) {
-      ctx.fillStyle = `rgba(255,255,255,${(nextRand() * 0.14).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(nextRand() * 320, nextRand() * 240, nextRand() * 5 + 1, 0, Math.PI * 2);
-      ctx.fill();
+  const safeDetect = async (source: FaceSource): Promise<FaceHit | null> => {
+    try {
+      return await detectFace(source);
+    } catch {
+      setCaptureMsg('No se pudo cargar el motor de reconocimiento (requiere conexión la primera vez).');
+      return null;
     }
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.font = 'bold 72px "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const parts = (user?.name || 'MF').trim().split(/\s+/);
-    const initials = (parts[0]?.[0] || 'M') + (parts[1]?.[0] || 'F');
-    ctx.fillText(initials.toUpperCase(), 160, 120);
-    return canvas.toDataURL('image/jpeg', 0.85);
   };
 
   const renderFrame = (source: CanvasImageSource, width: number, height: number): string => {
@@ -283,20 +234,78 @@ export function Identity() {
       const image = await loadImage(probeSource);
       return renderFrame(image, image.width, image.height);
     }
-    const synthetic = syntheticSample();
-    if (!synthetic) return '';
-    const image = await loadImage(synthetic);
-    return renderFrame(image, image.width, image.height);
+    return '';
   };
 
+  // Detección en vivo: 400 puntos de profundidad sobre el video
+  useEffect(() => {
+    if (!cameraOn) return;
+    const id = window.setInterval(() => {
+      void (async () => {
+        const video = videoRef.current;
+        if (!video || video.readyState < 2) return;
+        const hit = await safeDetect(video);
+        liveHitRef.current = hit;
+        setFaceDetected(!!hit);
+        const overlay = overlayRef.current;
+        if (overlay) {
+          if (video.videoWidth && overlay.width !== video.videoWidth) {
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+          }
+          drawFaceOverlay(overlay, hit);
+        }
+        if (!hit) {
+          setScanMsg('Buscando el rostro… mira a la cámara');
+        } else if (hit.box.width < 0.12) {
+          setScanMsg('Acércate un poco a la cámara');
+        } else if (Math.abs(hit.box.x + hit.box.width / 2 - 0.5) > 0.25) {
+          setScanMsg('Coloca el rostro en el centro del marco');
+        } else {
+          setScanMsg(`${GEOM_POINTS} puntos detectados · listo para capturar`);
+        }
+      })();
+    }, 300);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraOn]);
+
   const captureSample = async () => {
-    if (samples.length >= MAX_SAMPLES) return;
-    const frame = await renderProbe();
-    if (!frame) return;
-    setSamples(prev => [...prev, frame]);
-    setResult(null);
-    const analyzed = await analyzeFrame(frame);
-    if (analyzed) setQuality(analyzed);
+    const video = videoRef.current;
+    let source: FaceSource | null = null;
+    if (cameraOn && video && video.videoWidth > 0) {
+      source = video;
+    } else if (probeSource) {
+      try {
+        source = await loadImage(probeSource);
+      } catch {
+        source = null;
+      }
+    }
+    if (!source) {
+      setCaptureMsg('Activa la cámara o sube una foto con un rostro para capturar.');
+      return;
+    }
+    setCaptureMsg('');
+    const hit = liveHitRef.current && source === video ? liveHitRef.current : await safeDetect(source);
+    if (!hit) {
+      setCaptureMsg('No se detectó rostro en la imagen. Corrige el encuadre e inténtalo de nuevo.');
+      setSample(null);
+      setDescriptor(null);
+      return;
+    }
+    try {
+      const vector = await buildDescriptor(hit, source);
+      const frame = await renderProbe();
+      setSample(frame || null);
+      setDescriptor(vector);
+      setResult(null);
+      setSaveMsg('');
+      const analyzed = await analyzeFrame(frame);
+      if (analyzed) setQuality(analyzed);
+    } catch {
+      setCaptureMsg('No se pudo procesar la captura. Inténtalo de nuevo.');
+    }
   };
 
   const autoFrame = async () => {
@@ -306,28 +315,14 @@ export function Identity() {
       setAutoMsg('Activa la cámara para usar el auto-encuadre.');
       return;
     }
-    type FaceDetectorLike = {
-      detect(video: HTMLVideoElement): Promise<Array<{ boundingBox: { width: number } }>>;
-    };
-    const Ctor = (window as unknown as { FaceDetector?: new (options: unknown) => FaceDetectorLike }).FaceDetector;
-    if (!Ctor) {
-      setAutoMsg('Tu navegador no soporta auto-encuadre; ajusta el zoom manualmente.');
+    const hit = await safeDetect(video);
+    if (!hit) {
+      setAutoMsg('No se detectó rostro: acércate a la cámara y mira al centro.');
       return;
     }
-    try {
-      const detector = new Ctor({ maxDetectedFaces: 1, fastMode: true });
-      const faces = await detector.detect(video);
-      if (faces.length === 0) {
-        setAutoMsg('No se detectó rostro: acércate a la cámara y mira al centro.');
-        return;
-      }
-      const faceWidth = faces[0].boundingBox.width;
-      const target = Math.min(200, Math.max(100, Math.round((0.45 * video.videoWidth) / faceWidth * 100)));
-      setZoom(target);
-      setAutoMsg(`Encuadre ajustado automáticamente: zoom ${target}%.`);
-    } catch {
-      setAutoMsg('No se pudo detectar el rostro. Ajusta el zoom manualmente.');
-    }
+    const target = Math.min(200, Math.max(100, Math.round((0.45 / hit.box.width) * 100)));
+    setZoom(target);
+    setAutoMsg(`Encuadre ajustado automáticamente: zoom ${target}%.`);
   };
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,54 +340,75 @@ export function Identity() {
     const scale = Math.min(1, side / Math.max(image.width, image.height));
     setProbeSource(toDataUrl(image, Math.round(image.width * scale), Math.round(image.height * scale)));
     setResult(null);
+    setCaptureMsg('');
+    setSample(null);
+    setDescriptor(null);
   };
 
-  const saveTemplate = () => {
-    if (samples.length < MAX_SAMPLES) return;
-    const templateData = samples[samples.length - 1];
-    const stamp = new Date().toISOString();
+  const saveTemplate = async () => {
+    if (!descriptor) return;
+    setBusy(true);
+    setSaveMsg('');
     try {
-      localStorage.setItem(TEMPLATE_KEY, templateData);
-      localStorage.setItem(REGISTERED_KEY, stamp);
-    } catch {
-      // almacenamiento no disponible
+      await authApi.saveFace({ vector: descriptor, points: GEOM_POINTS, threshold });
+      setSaveMsg(`Plantilla guardada con ${GEOM_POINTS} puntos de profundidad.`);
+      setResult(null);
+      await refreshUser();
+    } catch (error) {
+      setSaveMsg(errorMessage(error, 'No se pudo guardar la plantilla en el servidor.'));
+    } finally {
+      setBusy(false);
     }
-    setTemplate(templateData);
-    setRegisteredAt(stamp);
-    setResult(null);
   };
 
-  const replaceTemplate = () => {
-    setSamples([]);
-    setResult(null);
+  const replaceTemplate = async () => {
+    setBusy(true);
+    setSaveMsg('');
     try {
-      localStorage.removeItem(TEMPLATE_KEY);
-      localStorage.removeItem(REGISTERED_KEY);
-    } catch {
-      // almacenamiento no disponible
+      await authApi.deleteFace();
+      setSample(null);
+      setDescriptor(null);
+      setResult(null);
+      setSaveMsg('Plantilla facial eliminada.');
+      await refreshUser();
+    } catch (error) {
+      setSaveMsg(errorMessage(error, 'No se pudo eliminar la plantilla.'));
+    } finally {
+      setBusy(false);
     }
-    setTemplate(null);
-    setRegisteredAt(null);
   };
 
   const identify = async () => {
-    if (!template) return;
+    if (!descriptor) return;
     setBusy(true);
-    const probe = await renderProbe();
-    const score = probe ? await similarity(template, probe) : 0;
-    setResult({ ok: score >= threshold / 100, score: Math.round(score * 1000) / 1000 });
-    setBusy(false);
+    setSaveMsg('');
+    try {
+      const response = await authApi.verifyFace({ vector: descriptor, threshold });
+      setResult({
+        ok: response.ok,
+        score: Math.round(response.score * 1000) / 1000,
+        threshold: response.threshold,
+      });
+    } catch (error) {
+      setSaveMsg(errorMessage(error, 'No se pudo verificar el rostro.'));
+      setResult(null);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const reset = () => {
-    setSamples([]);
+    setSample(null);
+    setDescriptor(null);
     setResult(null);
     setProbeSource(undefined);
     setQuality(null);
+    setCaptureMsg('');
+    setSaveMsg('');
   };
 
   const resetAdjusts = () => {
-    setThreshold(90);
+    setThreshold(clampThreshold(user?.faceThreshold));
     setBrightness(100);
     setContrast(100);
     setZoom(100);
@@ -401,7 +417,8 @@ export function Identity() {
 
   if (!user) return null;
 
-  const hasTemplate = !!template;
+  const hasTemplate = !!user.faceRegistered;
+  const registeredAt = user.faceRegisteredAt || null;
   const chip = 'inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-border text-secondary text-xs sm:text-sm';
 
   const statusChip = (label: string, ok: boolean, okText: string, pendingText: string) => (
@@ -416,7 +433,7 @@ export function Identity() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text">Identidad Facial</h1>
-          <p className="text-secondary mt-1">Registra tu rostro y verifica quién eres con un solo botón</p>
+          <p className="text-secondary mt-1">Registra tu rostro con una sola captura y verifícalo con un botón</p>
         </div>
         <Link
           to="/dashboard"
@@ -438,7 +455,7 @@ export function Identity() {
         </span>
         <span className={chip}>
           <ScanFace className="w-4 h-4 text-success" />
-          Plantilla {hasTemplate ? 'registrada' : 'pendiente'}
+          {hasTemplate ? `${user.facePoints ?? GEOM_POINTS} puntos registrados` : 'Plantilla pendiente'}
         </span>
         <span className={chip}>
           {now.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' })}
@@ -448,18 +465,20 @@ export function Identity() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Módulo biométrico · Registro de plantilla</CardTitle>
-            <CardDescription>Captura {MAX_SAMPLES} muestras de calidad para construir tu plantilla facial</CardDescription>
+            <CardTitle>Módulo biométrico · Registro con 1 captura</CardTitle>
+            <CardDescription>
+              Una sola captura con {GEOM_POINTS} puntos de profundidad construye tu plantilla facial
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {statusChip('Cámara', cameraOn, 'Activa', 'Inactiva')}
-              {statusChip('Rostro', cameraOn || !!probeSource, 'Detectado', 'Pendiente')}
+              {statusChip('Rostro', faceDetected || !!probeSource, faceDetected ? 'Detectado' : 'En foto', 'Pendiente')}
               {statusChip(
                 'Calidad',
-                quality ? quality.ok : samples.length > 0,
-                quality ? quality.label : 'Buena',
-                quality ? quality.label : 'Sin muestras',
+                quality ? quality.ok : !!sample,
+                quality ? quality.label : sample ? 'Buena' : 'Sin captura',
+                quality ? quality.label : 'Sin captura',
               )}
               {statusChip('Plantilla', hasTemplate, 'Registrada', 'Pendiente')}
             </div>
@@ -483,11 +502,16 @@ export function Identity() {
                 }}
                 className={`w-full h-full object-cover transition-[filter,transform] duration-200 ${cameraOn ? '' : 'hidden'}`}
               />
+              <canvas
+                ref={overlayRef}
+                className={`absolute inset-0 w-full h-full pointer-events-none transition-transform duration-200 ${cameraOn ? '' : 'hidden'}`}
+                style={{ transform: `scale(${zoom / 100})` }}
+              />
               {!cameraOn && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
-                  {probeSource ? (
+                  {probeSource || sample ? (
                     <img
-                      src={probeSource}
+                      src={probeSource || sample || ''}
                       alt="Fuente de rostro"
                       style={{
                         filter: `brightness(${brightness}%) contrast(${contrast}%)`,
@@ -499,7 +523,7 @@ export function Identity() {
                     <>
                       <ScanFace className="w-14 h-14 text-white/40" />
                       <p className="text-sm text-white/60 px-6 text-center">
-                        {cameraError || 'Activa la cámara o usa una foto para capturar tus muestras'}
+                        {cameraError || 'Activa la cámara o usa una foto: basta con 1 captura'}
                       </p>
                     </>
                   )}
@@ -514,31 +538,37 @@ export function Identity() {
                 <span className={`w-2 h-2 rounded-full ${cameraOn ? 'bg-success animate-pulse' : 'bg-warning'}`} />
                 {cameraOn ? 'EN VIVO' : 'SIN CÁMARA'}
               </div>
+              {cameraOn && scanMsg && (
+                <div className="absolute bottom-3 left-3 right-3 px-2.5 py-1.5 rounded-md bg-black/50 text-white text-[11px] text-center">
+                  {scanMsg}
+                </div>
+              )}
             </div>
 
             <div>
               <div className="flex items-center justify-between text-xs text-secondary mb-1.5">
-                <span>Muestras de calidad</span>
-                <span className="font-medium text-text">{samples.length}/{MAX_SAMPLES}</span>
+                <span>Captura única (1 foto)</span>
+                <span className="font-medium text-text">{sample ? 1 : 0}/1</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${(samples.length / MAX_SAMPLES) * 100}%` }}
+                  style={{ width: sample ? '100%' : '0%' }}
                 />
               </div>
             </div>
 
-            {samples.length > 0 && (
+            {sample && (
               <div className="flex gap-2">
-                {samples.map((sample, index) => (
-                  <img
-                    key={index}
-                    src={sample}
-                    alt={`Muestra ${index + 1}`}
-                    className="w-16 h-16 rounded-lg border border-border object-cover"
-                  />
-                ))}
+                <img
+                  src={sample}
+                  alt="Captura del rostro"
+                  className="w-16 h-16 rounded-lg border border-border object-cover"
+                />
+                <div className="text-xs text-secondary self-center">
+                  <p className="font-medium text-text">{GEOM_POINTS} puntos de profundidad</p>
+                  <p>{descriptor ? `${descriptor.length} valores de descriptor` : 'Sin descriptor'}</p>
+                </div>
               </div>
             )}
 
@@ -556,9 +586,8 @@ export function Identity() {
                 size="sm"
                 leftIcon={<ScanFace className="w-4 h-4" />}
                 onClick={captureSample}
-                disabled={samples.length >= MAX_SAMPLES}
               >
-                Capturar muestra
+                Capturar rostro
               </Button>
               <Button size="sm" variant="outline" leftIcon={<Upload className="w-4 h-4" />} onClick={() => fileRef.current?.click()}>
                 Subir foto
@@ -569,7 +598,8 @@ export function Identity() {
                 variant="outline"
                 leftIcon={<CheckCircle2 className="w-4 h-4" />}
                 onClick={saveTemplate}
-                disabled={samples.length < MAX_SAMPLES}
+                disabled={!descriptor || busy}
+                loading={busy}
               >
                 {hasTemplate ? 'Reemplazar plantilla facial' : 'Registrar plantilla facial'}
               </Button>
@@ -577,7 +607,7 @@ export function Identity() {
                 size="sm"
                 leftIcon={<UserCheck className="w-4 h-4" />}
                 onClick={identify}
-                disabled={!hasTemplate || busy}
+                disabled={!descriptor || busy}
                 loading={busy}
               >
                 Identificar rostro
@@ -591,12 +621,18 @@ export function Identity() {
                 Reiniciar
               </Button>
               {hasTemplate && (
-                <Button size="sm" variant="ghost" onClick={replaceTemplate}>
+                <Button size="sm" variant="ghost" onClick={replaceTemplate} loading={busy}>
                   Borrar plantilla
                 </Button>
               )}
             </div>
 
+            {captureMsg && (
+              <p className="text-xs text-warning bg-warning/5 border border-warning/20 rounded-lg px-3 py-2">{captureMsg}</p>
+            )}
+            {saveMsg && (
+              <p className="text-xs text-secondary bg-bg border border-border rounded-lg px-3 py-2">{saveMsg}</p>
+            )}
             {cameraError && (
               <p className="text-xs text-warning bg-warning/5 border border-warning/20 rounded-lg px-3 py-2">{cameraError}</p>
             )}
@@ -622,8 +658,8 @@ export function Identity() {
               <Slider
                 label="Umbral de confianza"
                 value={threshold}
-                min={70}
-                max={99}
+                min={MIN_THRESHOLD}
+                max={MAX_THRESHOLD}
                 suffix="%"
                 icon={<Gauge className="w-3.5 h-3.5 text-primary" />}
                 onChange={setThreshold}
@@ -668,8 +704,9 @@ export function Identity() {
                 <p className="text-xs text-secondary bg-bg border border-border rounded-lg px-3 py-2">{autoMsg}</p>
               )}
               <p className="text-xs text-secondary">
-                La identificación valida la coincidencia contra el umbral de {threshold}%. Ajusta iluminación y contraste
-                hasta que la calidad marque <span className="text-success font-medium">Buena</span>.
+                Rango permitido {MIN_THRESHOLD}–{MAX_THRESHOLD}%. A mayor umbral, más exigente es la
+                verificación; a menor umbral, más laxa. Ajusta iluminación y contraste hasta que la
+                calidad marque <span className="text-success font-medium">Buena</span>.
               </p>
             </CardContent>
           </Card>
@@ -695,13 +732,25 @@ export function Identity() {
                   <dd className="font-mono font-medium text-text">{user.dni}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
+                  <dt className="text-secondary">Rango</dt>
+                  <dd className="font-medium text-text text-right">
+                    {ROLE_ICONS[user.role]} {ROLE_LABELS[user.role]}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
                   <dt className="text-secondary">Método</dt>
-                  <dd className="font-medium text-text text-right">Reconocimiento facial · 128D</dd>
+                  <dd className="font-medium text-text text-right">Reconocimiento facial · {GEOM_POINTS} puntos</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-secondary">Plantilla</dt>
                   <dd className={`font-medium ${hasTemplate ? 'text-success' : 'text-warning'}`}>
-                    {hasTemplate ? 'Registrada' : 'Pendiente'}
+                    {hasTemplate ? `${user.facePoints ?? GEOM_POINTS} puntos` : 'Pendiente'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-secondary">Umbral guardado</dt>
+                  <dd className="font-medium text-text text-right">
+                    {clampThreshold(user.faceThreshold)}%
                   </dd>
                 </div>
                 <div className="flex justify-between gap-3">
@@ -726,14 +775,14 @@ export function Identity() {
           <Card>
             <CardHeader>
               <CardTitle>Resultado de identificación</CardTitle>
-              <CardDescription>Comparación de tu rostro con la plantilla</CardDescription>
+              <CardDescription>Comparación de tu captura con la plantilla registrada</CardDescription>
             </CardHeader>
             <CardContent>
               {!result ? (
                 <p className="text-sm text-secondary">
-                  {hasTemplate
-                    ? 'Presiona "Identificar rostro" para comparar la última muestra con tu plantilla registrada.'
-                    : 'Primero registra tu plantilla facial con 3 muestras.'}
+                  {descriptor
+                    ? 'Presiona "Identificar rostro" para comparar tu captura con tu plantilla registrada.'
+                    : 'Primero captura tu rostro (1 foto) para identificarte.'}
                 </p>
               ) : result.ok ? (
                 <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success/5 p-3">
@@ -741,8 +790,11 @@ export function Identity() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text">Rostro coincidente: {user.name}</p>
                     <p className="text-xs text-secondary mt-0.5">
-                      Confianza {Math.round(result.score * 100)}% · Umbral {threshold}% · Identidad verificada
-                      correctamente
+                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% ·{' '}
+                      {GEOM_POINTS} puntos · Identidad verificada correctamente
+                    </p>
+                    <p className="text-xs text-secondary mt-0.5">
+                      {ROLE_ICONS[user.role]} Rango verificado: {ROLE_LABELS[user.role]}
                     </p>
                     <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
@@ -758,8 +810,8 @@ export function Identity() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text">Sin coincidencia</p>
                     <p className="text-xs text-secondary mt-0.5">
-                      Confianza {Math.round(result.score * 100)}% · Umbral {threshold}% · Ajusta la iluminación, el
-                      contraste o baja el umbral e inténtalo de nuevo
+                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% · Ajusta la
+                      iluminación, el contraste o revisa el umbral e inténtalo de nuevo
                     </p>
                     <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div

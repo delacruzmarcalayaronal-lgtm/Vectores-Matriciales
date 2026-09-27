@@ -1,66 +1,152 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, CheckCircle2, Loader2, RefreshCw, ScanFace, ShieldAlert } from 'lucide-react';
+import { Camera, CheckCircle2, Loader2, RefreshCw, ScanFace, ShieldAlert, Target } from 'lucide-react';
+import { buildDescriptor, detectFace, drawFaceOverlay, GEOM_POINTS, type FaceHit } from '../../lib/face';
 
-type ScanStatus = 'idle' | 'requesting' | 'scanning' | 'success' | 'denied';
+export interface FaceScanResult {
+  vector: number[] | null;
+  points: number;
+}
+
+type ScanStatus = 'idle' | 'requesting' | 'scanning' | 'success' | 'denied' | 'error';
 
 interface FaceScannerProps {
   disabled?: boolean;
-  onVerified: () => void;
+  onVerified: (result: FaceScanResult) => void;
   onReset?: () => void;
 }
 
+const STABLE_REQUIRED = 8;
+const SCAN_TIMEOUT_MS = 40000;
+
 export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
+  const demoTimerRef = useRef<number | null>(null);
+  const hitRef = useRef<FaceHit | null>(null);
+  const stableRef = useRef(0);
+  const startedRef = useRef(0);
+  const busyRef = useRef(false);
 
   const [status, setStatus] = useState<ScanStatus>('idle');
   const [progress, setProgress] = useState(0);
-  const [fallbackMode, setFallbackMode] = useState(false);
+  const [hint, setHint] = useState('Activa la cámara para validar tu identidad');
+  const [showDemo, setShowDemo] = useState(false);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
   }, []);
 
-  const clearTimer = useCallback(() => {
+  const clearTimers = useCallback(() => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (demoTimerRef.current) {
+      window.clearTimeout(demoTimerRef.current);
+      demoTimerRef.current = null;
     }
   }, []);
 
   useEffect(() => {
     return () => {
       stopCamera();
-      clearTimer();
+      clearTimers();
     };
-  }, [stopCamera, clearTimer]);
+  }, [stopCamera, clearTimers]);
 
-  const runScan = (fallback: boolean) => {
-    setFallbackMode(fallback);
-    setStatus('scanning');
-    setProgress(0);
-    clearTimer();
-
-    let value = 0;
-    timerRef.current = window.setInterval(() => {
-      value += 2 + Math.random() * 5;
-      if (value >= 100) {
-        clearTimer();
-        setProgress(100);
-        setStatus('success');
+  const finish = useCallback(
+    async (hit: FaceHit, video: HTMLVideoElement) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      clearTimers();
+      try {
+        const vector = await buildDescriptor(hit, video);
         stopCamera();
-        onVerified();
-      } else {
-        setProgress(value);
+        setStatus('success');
+        setProgress(100);
+        onVerified({ vector, points: GEOM_POINTS });
+      } catch {
+        setStatus('error');
+        setHint('No se pudo procesar el rostro. Reintenta o usa el modo demostración.');
+        setShowDemo(true);
+        stopCamera();
+      } finally {
+        busyRef.current = false;
       }
-    }, 60);
-  };
+    },
+    [clearTimers, onVerified, stopCamera],
+  );
+
+  const scanLoop = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    timerRef.current = window.setInterval(() => {
+      void (async () => {
+        const current = videoRef.current;
+        if (!current || current.readyState < 2) return;
+        let hit: FaceHit | null = null;
+        try {
+          hit = await detectFace(current);
+        } catch {
+          setStatus('error');
+          setHint('No se pudo cargar el motor de reconocimiento. Usa el modo demostración.');
+          setShowDemo(true);
+          stopCamera();
+          if (timerRef.current) {
+            window.clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          return;
+        }
+        hitRef.current = hit;
+        const overlay = overlayRef.current;
+        if (overlay) {
+          if (current.videoWidth && overlay.width !== current.videoWidth) {
+            overlay.width = current.videoWidth;
+            overlay.height = current.videoHeight;
+          }
+          drawFaceOverlay(overlay, hit, { stable: stableRef.current >= STABLE_REQUIRED });
+        }
+        if (!hit) {
+          stableRef.current = Math.max(0, stableRef.current - 1);
+          setHint('Buscando el rostro… mira a la cámara y mantén el rostro dentro del marco');
+          setProgress((stableRef.current / STABLE_REQUIRED) * 100);
+          return;
+        }
+        const box = hit.box;
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+        const wellFramed =
+          box.width >= 0.12 && box.width <= 0.95 && Math.abs(cx - 0.5) < 0.28 && Math.abs(cy - 0.5) < 0.28;
+        if (wellFramed) {
+          stableRef.current += 1;
+        } else {
+          stableRef.current = Math.max(0, stableRef.current - 1);
+          setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Coloca el rostro en el centro del marco');
+        }
+        setProgress((stableRef.current / STABLE_REQUIRED) * 100);
+        if (stableRef.current >= STABLE_REQUIRED) {
+          if (timerRef.current) {
+            window.clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          await finish(hit, current);
+        } else if (Date.now() - startedRef.current > SCAN_TIMEOUT_MS) {
+          setShowDemo(true);
+          setHint('Todavía no se detecta un rostro nítido: mejora la iluminación o usa el modo demostración');
+        }
+      })();
+    }, 280);
+  }, [finish, stopCamera]);
 
   const startCamera = async () => {
     if (disabled) return;
     setStatus('requesting');
+    setHint('Permite el acceso en el navegador');
+    setShowDemo(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 480, height: 480 },
@@ -71,29 +157,74 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      runScan(false);
+      stableRef.current = 0;
+      startedRef.current = Date.now();
+      setStatus('scanning');
+      setProgress(0);
+      setHint('Buscando el rostro… mira a la cámara y mantén el rostro dentro del marco');
+      scanLoop();
     } catch {
       setStatus('denied');
+      setHint('Sin permiso o sin dispositivo: usa el modo demostración');
+      setShowDemo(true);
     }
   };
 
-  const reset = () => {
-    clearTimer();
+  const captureNow = () => {
+    const hit = hitRef.current;
+    const video = videoRef.current;
+    if (!hit || !video || status !== 'scanning') return;
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    void finish(hit, video);
+  };
+
+  const runDemo = () => {
+    clearTimers();
     stopCamera();
+    setStatus('scanning');
+    setProgress(0);
+    setHint('Verificando rostro (demo)…');
+    let value = 0;
+    demoTimerRef.current = window.setInterval(() => {
+      value += 6 + Math.random() * 6;
+      if (value >= 100) {
+        if (demoTimerRef.current) {
+          window.clearInterval(demoTimerRef.current);
+          demoTimerRef.current = null;
+        }
+        setProgress(100);
+        setStatus('success');
+        onVerified({ vector: null, points: 0 });
+      } else {
+        setProgress(value);
+      }
+    }, 70);
+  };
+
+  const reset = () => {
+    clearTimers();
+    stopCamera();
+    stableRef.current = 0;
+    hitRef.current = null;
     setStatus('idle');
     setProgress(0);
-    setFallbackMode(false);
+    setHint('Activa la cámara para validar tu identidad');
+    setShowDemo(false);
     onReset?.();
   };
 
   const scanning = status === 'scanning';
+  const engineScan = scanning && !hint.startsWith('Verificando rostro (demo)');
 
   return (
     <div
       className={`rounded-xl border-2 border-dashed p-4 transition-colors ${
         status === 'success'
           ? 'border-success bg-success/5'
-          : status === 'denied'
+          : status === 'denied' || status === 'error'
             ? 'border-warning bg-warning/5'
             : scanning
               ? 'border-primary bg-primary/5'
@@ -103,7 +234,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
       <div className="flex items-center gap-3 mb-3">
         {status === 'success' ? (
           <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
-        ) : status === 'denied' ? (
+        ) : status === 'denied' || status === 'error' ? (
           <ShieldAlert className="w-5 h-5 text-warning flex-shrink-0" />
         ) : status === 'requesting' ? (
           <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0" />
@@ -114,17 +245,12 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           <p className="text-sm font-medium text-text">
             {status === 'idle' && 'Escaneo facial'}
             {status === 'requesting' && 'Solicitando acceso a la cámara…'}
-            {status === 'scanning' && (fallbackMode ? 'Verificando rostro (demo)…' : 'Verificando rostro…')}
+            {status === 'scanning' && (engineScan ? `Detección con ${GEOM_POINTS} puntos` : 'Verificando rostro (demo)…')}
             {status === 'success' && 'Rostro verificado'}
             {status === 'denied' && 'Cámara no disponible'}
+            {status === 'error' && 'Motor de detección no disponible'}
           </p>
-          <p className="text-xs text-secondary">
-            {status === 'idle' && 'Activa la cámara para validar tu identidad'}
-            {status === 'requesting' && 'Permite el acceso en el navegador'}
-            {status === 'scanning' && 'Mantén el rostro dentro del marco'}
-            {status === 'success' && 'Identidad validada correctamente'}
-            {status === 'denied' && 'Sin permiso o sin dispositivo: usa el modo demostración'}
-          </p>
+          <p className="text-xs text-secondary">{hint}</p>
         </div>
       </div>
 
@@ -134,25 +260,26 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           muted
           playsInline
           autoPlay
-          className={`w-full h-full object-cover ${!fallbackMode && (scanning || status === 'requesting') ? '' : 'hidden'}`}
+          className={`w-full h-full object-cover ${status === 'scanning' || status === 'requesting' ? '' : 'hidden'}`}
         />
-        {fallbackMode && scanning && (
-          <div className="w-full h-full flex items-center justify-center relative overflow-hidden">
-            <ScanFace className="w-16 h-16 text-white/40" />
-            <div
-              className="absolute left-0 right-0 h-0.5 bg-accent shadow-[0_0_12px_2px_rgba(6,182,212,0.8)]"
-              style={{ top: `${progress}%` }}
-            />
-          </div>
-        )}
+        <canvas
+          ref={overlayRef}
+          className={`absolute inset-0 w-full h-full pointer-events-none ${engineScan ? '' : 'hidden'}`}
+        />
         {status !== 'scanning' && status !== 'requesting' && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Camera className="w-10 h-10 text-white/30" />
           </div>
         )}
-        {scanning && (
+        {engineScan && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="w-40 h-40 rounded-2xl border-2 border-accent/80 animate-pulse" />
+            <div className="w-40 h-40 rounded-2xl border-2 border-accent/80" />
+          </div>
+        )}
+        {scanning && (
+          <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/50 text-white text-[11px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            {engineScan ? `${GEOM_POINTS} PUNTOS` : 'DEMO'}
           </div>
         )}
       </div>
@@ -160,7 +287,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
       {scanning && (
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-secondary mb-1">
-            <span>Analizando rasgos faciales</span>
+            <span>{engineScan ? 'Estabilizando el encuadre del rostro' : 'Validación de demostración'}</span>
             <span>{Math.round(progress)}%</span>
           </div>
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -172,7 +299,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {status === 'idle' && (
           <button
             type="button"
@@ -187,11 +314,21 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         {status === 'requesting' && (
           <span className="text-sm text-secondary">Esperando permiso de cámara…</span>
         )}
-        {status === 'denied' && (
+        {engineScan && (
+          <button
+            type="button"
+            onClick={captureNow}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Target className="w-4 h-4" />
+            Capturar ahora
+          </button>
+        )}
+        {(status === 'denied' || status === 'error') && (
           <>
             <button
               type="button"
-              onClick={() => runScan(true)}
+              onClick={runDemo}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <ScanFace className="w-4 h-4" />
@@ -205,6 +342,15 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
               Reintentar cámara
             </button>
           </>
+        )}
+        {showDemo && status === 'scanning' && (
+          <button
+            type="button"
+            onClick={runDemo}
+            className="text-sm text-secondary hover:text-text underline"
+          >
+            Continuar en modo demostración
+          </button>
         )}
         {status === 'success' && (
           <button

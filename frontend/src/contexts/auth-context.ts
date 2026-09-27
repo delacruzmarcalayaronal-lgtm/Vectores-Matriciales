@@ -9,8 +9,8 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (dni: string) => Promise<void>;
-  loginWithFace: (dni?: string) => Promise<void>;
-  register: (name: string, dni: string) => Promise<void>;
+  loginWithFace: (dni?: string, faceVector?: number[]) => Promise<void>;
+  register: (name: string, dni: string, faceVector?: number[] | null, facePoints?: number | null) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
