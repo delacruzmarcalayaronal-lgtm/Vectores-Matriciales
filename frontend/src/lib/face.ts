@@ -230,29 +230,50 @@ export function clampThreshold(value?: number | null, fallback?: number | null):
 export function drawFaceOverlay(
   canvas: HTMLCanvasElement,
   hit: FaceHit | null,
-  options: { stable?: boolean } = {},
+  options: { stable?: boolean; smoothBox?: FaceHit['box'] } = {},
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!hit) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+  const box = hit ? options.smoothBox ?? hit.box : null;
+  const cx = box ? (box.x + box.width / 2) * width : width / 2;
+  const cy = box ? (box.y + box.height / 2) * height : height / 2;
+  const rx = box ? Math.max(10, box.width * width * 0.62) : width * 0.3;
+  const ry = box ? Math.max(10, box.height * height * 0.66) : height * 0.4;
   const color = options.stable ? '#22C55E' : '#06B6D4';
+
+  // Máscara: oscurece todo fuera de la elipse que envuelve el rostro
+  ctx.save();
+  ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
+  ctx.fillRect(0, 0, width, height);
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Contorno de la máscara (guía fija mientras no hay rostro)
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.5, width / 300);
+  if (!box) ctx.setLineDash([width / 42, width / 30]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  if (!hit) return;
+
+  // Puntos de profundidad: contorno, ojos, nariz y boca
   const step = hit.landmarks.length > GEOM_POINTS ? hit.landmarks.length / GEOM_POINTS : 1;
   ctx.fillStyle = color;
   for (let i = 0; i < GEOM_POINTS; i += 1) {
     const point = hit.landmarks[Math.floor(i * step)];
     if (!point) continue;
     ctx.beginPath();
-    ctx.arc(point.x * canvas.width, point.y * canvas.height, 1.4, 0, Math.PI * 2);
+    ctx.arc(point.x * width, point.y * height, 1.4, 0, Math.PI * 2);
     ctx.fill();
   }
-  const box = hit.box;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(
-    box.x * canvas.width,
-    box.y * canvas.height,
-    box.width * canvas.width,
-    box.height * canvas.height,
-  );
 }

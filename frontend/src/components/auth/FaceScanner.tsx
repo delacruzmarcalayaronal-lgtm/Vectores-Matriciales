@@ -25,6 +25,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
   const timerRef = useRef<number | null>(null);
   const demoTimerRef = useRef<number | null>(null);
   const hitRef = useRef<FaceHit | null>(null);
+  const smoothBoxRef = useRef<FaceHit['box'] | null>(null);
   const stableRef = useRef(0);
   const startedRef = useRef(0);
   const busyRef = useRef(false);
@@ -102,17 +103,32 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           return;
         }
         hitRef.current = hit;
+        let smoothBox: FaceHit['box'] | undefined;
+        if (hit) {
+          const prev = smoothBoxRef.current;
+          smoothBox = prev
+            ? {
+                x: prev.x + (hit.box.x - prev.x) * 0.5,
+                y: prev.y + (hit.box.y - prev.y) * 0.5,
+                width: prev.width + (hit.box.width - prev.width) * 0.5,
+                height: prev.height + (hit.box.height - prev.height) * 0.5,
+              }
+            : hit.box;
+          smoothBoxRef.current = smoothBox;
+        } else {
+          smoothBoxRef.current = null;
+        }
         const overlay = overlayRef.current;
         if (overlay) {
           if (current.videoWidth && overlay.width !== current.videoWidth) {
             overlay.width = current.videoWidth;
             overlay.height = current.videoHeight;
           }
-          drawFaceOverlay(overlay, hit, { stable: stableRef.current >= STABLE_REQUIRED });
+          drawFaceOverlay(overlay, hit, { stable: stableRef.current >= STABLE_REQUIRED, smoothBox });
         }
         if (!hit) {
           stableRef.current = Math.max(0, stableRef.current - 1);
-          setHint('Buscando el rostro… mira a la cámara y mantén el rostro dentro del marco');
+          setHint('Buscando el rostro… coloca tu rostro dentro de la máscara ovalada');
           setProgress((stableRef.current / STABLE_REQUIRED) * 100);
           return;
         }
@@ -125,7 +141,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           stableRef.current += 1;
         } else {
           stableRef.current = Math.max(0, stableRef.current - 1);
-          setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Coloca el rostro en el centro del marco');
+          setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Centra tu rostro en la máscara ovalada');
         }
         setProgress((stableRef.current / STABLE_REQUIRED) * 100);
         if (stableRef.current >= STABLE_REQUIRED) {
@@ -158,10 +174,11 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         await videoRef.current.play();
       }
       stableRef.current = 0;
+      smoothBoxRef.current = null;
       startedRef.current = Date.now();
       setStatus('scanning');
       setProgress(0);
-      setHint('Buscando el rostro… mira a la cámara y mantén el rostro dentro del marco');
+      setHint('Buscando el rostro… coloca tu rostro dentro de la máscara ovalada');
       scanLoop();
     } catch {
       setStatus('denied');
@@ -209,6 +226,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
     stopCamera();
     stableRef.current = 0;
     hitRef.current = null;
+    smoothBoxRef.current = null;
     setStatus('idle');
     setProgress(0);
     setHint('Activa la cámara para validar tu identidad');
@@ -269,11 +287,6 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         {status !== 'scanning' && status !== 'requesting' && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Camera className="w-10 h-10 text-white/30" />
-          </div>
-        )}
-        {engineScan && (
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="w-40 h-40 rounded-2xl border-2 border-accent/80" />
           </div>
         )}
         {scanning && (

@@ -136,6 +136,10 @@ export function Identity() {
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const liveHitRef = useRef<FaceHit | null>(null);
+  const smoothLiveRef = useRef<FaceHit['box'] | null>(null);
+  const autoLastRef = useRef(0);
+  const autoBusyRef = useRef(false);
+  const liveStateRef = useRef({ faceRegistered: false, manual: false, threshold: 50 });
 
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -162,8 +166,17 @@ export function Identity() {
     streamRef.current = null;
     setCameraOn(false);
     liveHitRef.current = null;
+    smoothLiveRef.current = null;
     setFaceDetected(false);
   }, []);
+
+  useEffect(() => {
+    liveStateRef.current = {
+      faceRegistered: !!user?.faceRegistered,
+      manual: !!sample || !!descriptor,
+      threshold,
+    };
+  });
 
   useEffect(() => {
     return () => {
@@ -247,22 +260,62 @@ export function Identity() {
         const hit = await safeDetect(video);
         liveHitRef.current = hit;
         setFaceDetected(!!hit);
+        let smoothBox: FaceHit['box'] | undefined;
+        if (hit) {
+          const prev = smoothLiveRef.current;
+          smoothBox = prev
+            ? {
+                x: prev.x + (hit.box.x - prev.x) * 0.5,
+                y: prev.y + (hit.box.y - prev.y) * 0.5,
+                width: prev.width + (hit.box.width - prev.width) * 0.5,
+                height: prev.height + (hit.box.height - prev.height) * 0.5,
+              }
+            : hit.box;
+          smoothLiveRef.current = smoothBox;
+        } else {
+          smoothLiveRef.current = null;
+        }
         const overlay = overlayRef.current;
         if (overlay) {
           if (video.videoWidth && overlay.width !== video.videoWidth) {
             overlay.width = video.videoWidth;
             overlay.height = video.videoHeight;
           }
-          drawFaceOverlay(overlay, hit);
+          drawFaceOverlay(overlay, hit, { smoothBox });
         }
         if (!hit) {
-          setScanMsg('Buscando el rostro… mira a la cámara');
+          setScanMsg('Buscando el rostro… coloca tu rostro dentro de la máscara ovalada');
         } else if (hit.box.width < 0.12) {
           setScanMsg('Acércate un poco a la cámara');
         } else if (Math.abs(hit.box.x + hit.box.width / 2 - 0.5) > 0.25) {
-          setScanMsg('Coloca el rostro en el centro del marco');
+          setScanMsg('Centra tu rostro en la máscara ovalada');
         } else {
-          setScanMsg(`${GEOM_POINTS} puntos detectados · listo para capturar`);
+          const state = liveStateRef.current;
+          const autoActive = state.faceRegistered && !state.manual;
+          setScanMsg(
+            autoActive
+              ? `${GEOM_POINTS} puntos · ojos, nariz y boca detectados · identificándote automáticamente…`
+              : `${GEOM_POINTS} puntos · ojos, nariz y boca detectados · listo para capturar`,
+          );
+          if (autoActive && !autoBusyRef.current && Date.now() - autoLastRef.current >= 2500) {
+            autoLastRef.current = Date.now();
+            autoBusyRef.current = true;
+            void (async () => {
+              try {
+                const vector = await buildDescriptor(hit, video);
+                const response = await authApi.verifyFace({ vector, threshold: state.threshold });
+                setResult({
+                  ok: response.ok,
+                  score: Math.round(response.score * 1000) / 1000,
+                  threshold: response.threshold,
+                });
+              } catch {
+                // sin conexión o motor ocupado: se reintenta en el siguiente ciclo
+              } finally {
+                autoBusyRef.current = false;
+              }
+            })();
+          }
         }
       })();
     }, 300);
@@ -527,11 +580,6 @@ export function Identity() {
                       </p>
                     </>
                   )}
-                </div>
-              )}
-              {cameraOn && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-2xl border-2 border-accent/80 animate-pulse" />
                 </div>
               )}
               <div className="absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1 rounded-md bg-black/50 text-white text-xs">

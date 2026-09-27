@@ -73,8 +73,43 @@ function resolve(mode: ThemeMode): { dark: boolean; preset: string | null } {
   return { dark: true, preset: `theme-${mode}` };
 }
 
+function relativeLuminance(hex: string): number {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return 1;
+  const value = parseInt(match[1], 16);
+  const channel = (raw: number) => {
+    const c = raw / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return (
+    0.2126 * channel((value >> 16) & 255) +
+    0.7152 * channel((value >> 8) & 255) +
+    0.0722 * channel(value & 255)
+  );
+}
+
+function mixWithWhite(hex: string): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return hex;
+  const value = parseInt(match[1], 16);
+  const mix = (raw: number) => Math.round(raw * 0.5 + 255 * 0.5);
+  const parts = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map(raw =>
+    mix(raw).toString(16).padStart(2, '0'),
+  );
+  return `#${parts.join('')}`;
+}
+
 export function applyPrimary(color: string) {
-  document.documentElement.style.setProperty('--color-primary', color);
+  const root = document.documentElement;
+  const base = /^#[0-9a-f]{6}$/i.test(color.trim()) ? color : DEFAULT_PRIMARY;
+  root.style.setProperty('--color-primary', base);
+  root.style.setProperty('--color-primary-base', base);
+  // Acentos oscuros: variante legible para texto/iconos sobre fondos oscuros (tema dark)
+  if (relativeLuminance(base) < 0.18) {
+    root.style.setProperty('--color-primary-readable', mixWithWhite(base));
+  } else {
+    root.style.removeProperty('--color-primary-readable');
+  }
 }
 
 export function applyTheme(mode: ThemeMode) {

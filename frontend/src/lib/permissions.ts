@@ -53,9 +53,9 @@ export const ROLE_ICONS: Record<Role, string> = {
 
 export const ROLE_MODULES: Record<Role, ModuleKey[]> = {
   admin: ALL_MODULES,
-  manager: ['dashboard', 'empresa', 'sucursales', 'productos', 'ventas', 'inventario', 'reportes', 'identidad', 'geografia'],
-  analyst: ['dashboard', 'vectores', 'matrices', 'operaciones', 'combinaciones', 'historial', 'identidad'],
-  operator: ['dashboard', 'ventas', 'inventario', 'identidad'],
+  manager: ['dashboard', 'empresa', 'sucursales', 'productos', 'ventas', 'inventario', 'reportes', 'identidad', 'geografia', 'configuracion'],
+  analyst: ['dashboard', 'vectores', 'matrices', 'operaciones', 'combinaciones', 'historial', 'identidad', 'configuracion'],
+  operator: ['dashboard', 'ventas', 'inventario', 'identidad', 'configuracion'],
 };
 
 export function can(role: Role | undefined | null, module: ModuleKey): boolean {

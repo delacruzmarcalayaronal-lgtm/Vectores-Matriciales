@@ -103,6 +103,14 @@ html.dark .disabled\:bg-gray-50:disabled {
   background-color: var(--surface-3);
 }
 
+/* ===== Acento oscuro legible: texto/iconos claros en tema oscuro, botones conservan el color elegido ===== */
+html.dark body {
+  --color-primary: var(--color-primary-readable, var(--color-primary-base, #2563EB));
+}
+html.dark .bg-primary.text-white {
+  background-color: var(--color-primary-base, var(--color-primary));
+}
+
 /* ===== Presetas oscuras ===== */
 html.dark.theme-midnight {
   --color-bg: #03060E;

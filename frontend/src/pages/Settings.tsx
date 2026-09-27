@@ -18,6 +18,7 @@ import {
   type ThemeMode, getStoredTheme, getStoredPrimary, setThemePreference, setPrimaryColor, THEME_OPTIONS, TECH_COLOR_GROUPS
 } from '../lib/theme';
 import { useNotice } from '../hooks/useNotice';
+import { useAuth } from '../contexts/useAuth';
 import {
   companiesApi,
   salesApi,
@@ -58,7 +59,9 @@ const THEME_CARDS: Record<ThemeMode, { label: string; bg: string; surface: strin
 };
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState('general');
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'general' : 'appearance');
   const [saving, setSaving] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme());
@@ -114,6 +117,7 @@ export function Settings() {
   const saleFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!isAdmin) return;
     companiesApi.get(COMPANY_ID)
       .then(c => setGeneral({
         name: c.name ?? '',
@@ -124,7 +128,7 @@ export function Settings() {
         phone: c.phone ?? '',
       }))
       .catch(err => console.error('Error loading company:', err));
-  }, []);
+  }, [isAdmin]);
 
   const setG = (key: keyof typeof general, value: string) =>
     setGeneral(prev => ({ ...prev, [key]: value }));
@@ -147,20 +151,27 @@ export function Settings() {
     { id: 'data', label: 'Datos', icon: <Database className="w-4 h-4" /> },
     { id: 'api', label: 'API', icon: <Key className="w-4 h-4" /> },
   ];
+  // Los trabajadores solo ven el configurador de temas (Apariencia)
+  const visibleTabs = isAdmin ? tabs : tabs.filter(tab => tab.id === 'appearance');
+  const effectiveTab = visibleTabs.some(tab => tab.id === activeTab)
+    ? activeTab
+    : isAdmin
+      ? 'general'
+      : 'appearance';
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (activeTab === 'general') {
+      if (effectiveTab === 'general') {
         await companiesApi.update(COMPANY_ID, general);
         show('Datos de la empresa guardados en la base de datos.');
-      } else if (activeTab === 'notifications') {
+      } else if (effectiveTab === 'notifications') {
         writePrefs('mf_notifications', notif);
         show('Preferencias de notificaciones guardadas.');
-      } else if (activeTab === 'security') {
+      } else if (effectiveTab === 'security') {
         writePrefs('mf_security', security);
         show('Configuración de seguridad guardada.');
-      } else if (activeTab === 'api') {
+      } else if (effectiveTab === 'api') {
         writePrefs('mf_api', apiPrefs);
         show('Configuración de API guardada.');
       } else {
@@ -425,9 +436,9 @@ export function Settings() {
         <p className="text-secondary mt-1">Parámetros y preferencias del sistema</p>
       </div>
 
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={visibleTabs} activeTab={effectiveTab} onChange={setActiveTab} />
 
-      <TabPanel id="general" activeTab={activeTab}>
+      <TabPanel id="general" activeTab={effectiveTab}>
         <Card>
           <CardHeader>
             <CardTitle>Configuración General</CardTitle>
@@ -477,7 +488,7 @@ export function Settings() {
         </Card>
       </TabPanel>
 
-      <TabPanel id="appearance" activeTab={activeTab}>
+      <TabPanel id="appearance" activeTab={effectiveTab}>
         <Card>
           <CardHeader>
             <CardTitle>Apariencia</CardTitle>
@@ -618,7 +629,7 @@ export function Settings() {
         </Card>
       </TabPanel>
 
-      <TabPanel id="notifications" activeTab={activeTab}>
+      <TabPanel id="notifications" activeTab={effectiveTab}>
         <Card>
           <CardHeader>
             <CardTitle>Notificaciones</CardTitle>
@@ -656,7 +667,7 @@ export function Settings() {
         </Card>
       </TabPanel>
 
-      <TabPanel id="security" activeTab={activeTab}>
+      <TabPanel id="security" activeTab={effectiveTab}>
         <Card>
           <CardHeader>
             <CardTitle>Seguridad</CardTitle>
@@ -710,7 +721,7 @@ export function Settings() {
         </Card>
       </TabPanel>
 
-      <TabPanel id="data" activeTab={activeTab}>
+      <TabPanel id="data" activeTab={effectiveTab}>
         <Card>
           <CardHeader>
             <CardTitle>Gestión de Datos</CardTitle>
@@ -798,7 +809,7 @@ export function Settings() {
         </Card>
       </TabPanel>
 
-      <TabPanel id="api" activeTab={activeTab}>
+      <TabPanel id="api" activeTab={effectiveTab}>
         <Card>
           <CardHeader>
             <CardTitle>Configuración API</CardTitle>
