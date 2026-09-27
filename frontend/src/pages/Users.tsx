@@ -141,7 +141,7 @@ export function Users() {
                 header: 'Usuario',
                 render: (row) => (
                   <div className="flex items-center gap-3">
-                    <Avatar name={row.name} size="sm" />
+                    <Avatar name={row.name} src={row.avatar} size="sm" />
                     <div>
                       <p className="font-medium text-text">{row.name}</p>
                       <p className="text-xs text-secondary font-mono">DNI {row.dni || '—'}</p>
@@ -245,7 +245,7 @@ export function Users() {
         {viewingUser && (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <Avatar name={viewingUser.name} size="lg" />
+              <Avatar name={viewingUser.name} src={viewingUser.avatar} size="lg" />
               <div>
                 <p className="text-lg font-semibold text-text">{viewingUser.name}</p>
                 <p className="text-sm text-secondary font-mono">DNI {viewingUser.dni || '—'}</p>

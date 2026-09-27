@@ -31,6 +31,8 @@ export interface WorkerLastLocation {
   lastSeen: string;
   minutesAgo: number;
   status: TrackingStatus;
+  address?: string | null;
+  distanceKm?: number;
 }
 
 export interface WorkerItem {

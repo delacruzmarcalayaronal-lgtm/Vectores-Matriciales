@@ -36,6 +36,8 @@ class WorkerLastLocation(BaseModel):
     lastSeen: str
     minutesAgo: int
     status: StatusKind
+    address: str | None = None
+    distanceKm: float = 0.0
 
 
 class ConsentCreate(BaseModel):

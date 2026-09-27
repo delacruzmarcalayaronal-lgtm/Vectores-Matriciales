@@ -3,12 +3,15 @@ import { useGeolocation, type GeolocationPosition as TrackedPosition } from './u
 import { locationsApi } from '../services/locationApi';
 
 const INTERVAL_MS = 60_000;
+/** Precisión máxima aceptable (m): por encima es ubicación aproximada por IP. */
+const MAX_ACCURACY_M = 1000;
 
 interface UseLocationTrackingResult {
   isTracking: boolean;
   permission: string;
   lastSent: string | null;
   error: string | null;
+  imprecise: boolean;
   requestPermission: () => void;
   stopTracking: () => void;
 }
@@ -18,6 +21,7 @@ export function useLocationTracking(enabled: boolean): UseLocationTrackingResult
   const { permission, position, error, requestPermission, stopTracking } = useGeolocation();
   const [lastSent, setLastSent] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [imprecise, setImprecise] = useState(false);
   const positionRef = useRef<TrackedPosition | null>(null);
 
   useEffect(() => {
@@ -40,6 +44,12 @@ export function useLocationTracking(enabled: boolean): UseLocationTrackingResult
       if (document.visibilityState === 'hidden') return;
       const pos = positionRef.current;
       if (!pos) return;
+      if (typeof pos.accuracy === 'number' && pos.accuracy > MAX_ACCURACY_M) {
+        // Sin GPS fiable (p. ej. ubicación por IP): no registrar posiciones
+        // que no corresponden a donde está el usuario.
+        setImprecise(true);
+        return;
+      }
       try {
         await locationsApi.sendLocation({
           latitude: pos.latitude,
@@ -48,6 +58,7 @@ export function useLocationTracking(enabled: boolean): UseLocationTrackingResult
           speed: pos.speed ?? undefined,
           heading: pos.heading ?? undefined,
         });
+        setImprecise(false);
         setLastSent(new Date().toISOString());
         setSendError(null);
       } catch {
@@ -67,6 +78,7 @@ export function useLocationTracking(enabled: boolean): UseLocationTrackingResult
     permission,
     lastSent,
     error: sendError ?? error,
+    imprecise,
     requestPermission,
     stopTracking,
   };

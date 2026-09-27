@@ -291,6 +291,20 @@ export function AdminMap() {
                     <div className="text-xs text-secondary">
                       DNI {row.employeeCode} · {formatAgo(row.minutesAgo)}
                     </div>
+                    <div className="flex items-start gap-1.5 text-xs text-secondary mt-1">
+                      <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
+                      <span className="line-clamp-2">
+                        {row.address ?? `${row.latitude.toFixed(5)}, ${row.longitude.toFixed(5)}`}
+                      </span>
+                    </div>
+                    {typeof row.distanceKm === 'number' && (
+                      <div className="text-xs font-medium text-primary mt-0.5">
+                        {row.distanceKm < 10
+                          ? `${row.distanceKm.toFixed(2)} km`
+                          : `${row.distanceKm.toFixed(1)} km`}{' '}
+                        de la sede SENATI
+                      </div>
+                    )}
                   </div>
                   <span
                     className={clsx(

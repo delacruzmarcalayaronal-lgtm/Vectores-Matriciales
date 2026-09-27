@@ -17,7 +17,7 @@ export function Layout() {
   const [consent, setConsent] = useState<'accepted' | 'denied' | null>(readConsent);
   const { user } = useAuth();
   const hasSidebar = user?.role === 'admin';
-  const { isTracking, permission } = useLocationTracking(consent === 'accepted');
+  const { isTracking, permission, imprecise } = useLocationTracking(consent === 'accepted');
 
   useEffect(() => {
     const onChange = () => setConsent(readConsent());
@@ -68,7 +68,7 @@ export function Layout() {
       />
 
       <main className={clsx('relative pt-16 transition-all duration-300 print:pt-0', hasSidebar && 'lg:ml-16 print:ml-0')}>
-        <LocationStatusBanner consent={consent} isTracking={isTracking} permission={permission} />
+        <LocationStatusBanner consent={consent} isTracking={isTracking} permission={permission} imprecise={imprecise} />
         <div className="p-4 sm:p-6 lg:p-8 print:p-0">
           <Outlet />
         </div>

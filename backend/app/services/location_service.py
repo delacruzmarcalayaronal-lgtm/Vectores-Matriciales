@@ -15,7 +15,12 @@ from ..schemas.location import (
     WorkerLastLocation,
 )
 from ..repositories.location_repository import LocationRepository
+from .geocode import reverse_address
 from .location_cache import location_cache
+
+# Precisión máxima aceptable (m). Por encima es ubicación aproximada por IP,
+# no GPS: se descarta para no pintar posiciones que no corresponden al usuario.
+MAX_ACCURACY_METERS = 1000.0
 
 
 class LocationService:
@@ -78,6 +83,16 @@ class LocationService:
                 status_code=403,
                 detail="Rastreo desactivado: no se ha dado consentimiento",
             )
+        if data.accuracy is not None and data.accuracy > MAX_ACCURACY_METERS:
+            from fastapi import HTTPException
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Ubicación imprecisa (±{data.accuracy:.0f} m > {MAX_ACCURACY_METERS} m): "
+                    "sin GPS fiable no se registra"
+                ),
+            )
         worker = self.repo.ensure_worker(user)
         self.db.commit()
         within = self.is_within_geofence(data.latitude, data.longitude)
@@ -118,6 +133,16 @@ class LocationService:
                     lastSeen=row["lastSeen"],
                     minutesAgo=minutes,
                     status=self.classify_status(minutes),
+                    address=reverse_address(row["latitude"], row["longitude"]),
+                    distanceKm=round(
+                        self.calculate_distance_km(
+                            settings.MAP_CENTER_LAT,
+                            settings.MAP_CENTER_LNG,
+                            row["latitude"],
+                            row["longitude"],
+                        ),
+                        3,
+                    ),
                 )
             )
         return out

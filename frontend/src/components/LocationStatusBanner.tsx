@@ -6,9 +6,10 @@ interface LocationStatusBannerProps {
   consent: 'accepted' | 'denied' | null;
   isTracking: boolean;
   permission: string;
+  imprecise?: boolean;
 }
 
-export function LocationStatusBanner({ consent, isTracking, permission }: LocationStatusBannerProps) {
+export function LocationStatusBanner({ consent, isTracking, permission, imprecise }: LocationStatusBannerProps) {
   if (!consent && permission !== 'denied') return null;
 
   const reactivate = () => {
@@ -53,6 +54,15 @@ export function LocationStatusBanner({ consent, isTracking, permission }: Locati
           <RefreshCcw className="w-3.5 h-3.5" />
           Reactivar
         </button>
+      </div>
+    );
+  }
+
+  if (consent === 'accepted' && imprecise) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-2 bg-warning/10 border-b border-warning/30 text-sm text-warning print:hidden">
+        <MapPinOff className="w-4 h-4 shrink-0" />
+        Ubicación imprecisa (sin GPS fiable): no se envía hasta tener una señal buena
       </div>
     );
   }

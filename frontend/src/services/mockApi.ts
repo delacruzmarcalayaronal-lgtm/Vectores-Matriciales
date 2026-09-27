@@ -595,6 +595,11 @@ export const mockLocationsApi = {
       lastSeen: loc.recordedAt,
       minutesAgo: Math.round((Date.now() - new Date(loc.recordedAt).getTime()) / 60000),
       status: MOCK_STATUSES[i] ?? 'offline',
+      address:
+        loc.workerId === 'w1'
+          ? 'Av. Pardo 528, Miraflores 15074, Lima'
+          : 'Av. Arequipa 2450, Lince 15046, Lima',
+      distanceKm: loc.workerId === 'w1' ? 5.6 : 7.5,
     }));
   },
   getWorkerHistory: async (workerId: string): Promise<LocationRecord[]> => { await delay(MOCK_DELAY); return MOCK_LOCATIONS.filter(l => l.workerId === workerId); },
@@ -619,4 +624,6 @@ const mockLatestOutside = () => ({
   lastSeen: MOCK_LOCATIONS[1].recordedAt,
   minutesAgo: 25,
   status: 'idle' as const,
+  address: 'Av. Arequipa 2450, Lince 15046, Lima',
+  distanceKm: 7.5,
 });

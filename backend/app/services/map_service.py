@@ -149,6 +149,23 @@ def _trace_popup_html(title: str, when: str, lat: float, lng: float) -> str:
     )
 
 
+def _hq_marker(fmap: folium.Map) -> None:
+    """Marcador fijo del punto de encuentro (sede SENATI Sede Central - Independencia)."""
+    folium.Marker(
+        location=[settings.MAP_CENTER_LAT, settings.MAP_CENTER_LNG],
+        tooltip="Punto de encuentro · SENATI Sede Central - Independencia",
+        popup=folium.Popup(
+            "<div style='font-family:sans-serif;font-size:12px'>"
+            "<b>Punto de encuentro</b><br>SENATI Sede Central - Independencia<br>"
+            "Av. Alfredo Mendiola 3520-3540, Independencia 15311, Lima<br>"
+            f"<span style='color:#555'>{settings.MAP_CENTER_LAT:.6f}, {settings.MAP_CENTER_LNG:.6f}</span>"
+            "</div>",
+            max_width=260,
+        ),
+        icon=folium.Icon(color="blue", icon="home", prefix="fa"),
+    ).add_to(fmap)
+
+
 def generate_workers_map(locations: list[WorkerLastLocation]) -> str:
     """Mapa Folium con la última ubicación de cada trabajador."""
     fmap = folium.Map(
@@ -156,6 +173,7 @@ def generate_workers_map(locations: list[WorkerLastLocation]) -> str:
         zoom_start=settings.MAP_ZOOM,
         tiles="OpenStreetMap",
     )
+    _hq_marker(fmap)
     for row in locations:
         color = STATUS_COLORS.get(row.status, "gray")
         _add_distance_ray(

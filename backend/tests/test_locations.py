@@ -73,6 +73,36 @@ class TestConsentAndLocations:
         assert client.get("/api/v1/locations/latest").status_code == 401
         assert client.post("/api/v1/locations", json=LIMA).status_code == 401
 
+    def test_imprecise_location_rejected(self, client, operator_token):
+        """Ubicación aproximada por IP (±50 km) no debe registrarse."""
+        headers = {"Authorization": f"Bearer {operator_token}"}
+        client.post(
+            "/api/v1/locations/consent",
+            json={"consentStatus": "accepted", "consentVersion": "v1"},
+            headers=headers,
+        )
+        r = client.post(
+            "/api/v1/locations",
+            json={**LIMA, "accuracy": 50000.0},
+            headers=headers,
+        )
+        assert r.status_code == 400, r.text
+        assert "imprecisa" in r.json()["message"].lower()
+
+    def test_reasonable_accuracy_accepted(self, client, operator_token):
+        headers = {"Authorization": f"Bearer {operator_token}"}
+        client.post(
+            "/api/v1/locations/consent",
+            json={"consentStatus": "accepted", "consentVersion": "v1"},
+            headers=headers,
+        )
+        r = client.post(
+            "/api/v1/locations",
+            json={"latitude": -12.0464, "longitude": -77.0428, "accuracy": 8.0},
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+
 
 class TestAdminMap:
     def test_latest_locations(self, client, admin_token):
@@ -82,6 +112,17 @@ class TestAdminMap:
         rows = r.json()
         assert len(rows) >= 1
         assert {"workerId", "workerName", "latitude", "longitude", "status"} <= set(rows[0])
+
+    def test_latest_locations_include_address_and_distance(self, client, admin_token):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        rows = client.get("/api/v1/locations/latest", headers=headers).json()
+        assert rows, "sin ubicaciones en la caché de sesión"
+        row = rows[0]
+        assert "address" in row and "distanceKm" in row
+        assert isinstance(row["distanceKm"], float)
+        assert row["distanceKm"] >= 0
+        if row["address"] is not None:
+            assert isinstance(row["address"], str) and row["address"]
 
     def test_workers_list(self, client, admin_token):
         headers = {"Authorization": f"Bearer {admin_token}"}
@@ -161,6 +202,14 @@ class TestAdminMap:
         r = client.get("/api/v1/locations/map", headers=headers)
         assert r.status_code == 200
         assert "fitBounds" in r.text
+
+    def test_live_map_marks_meeting_point(self, client, admin_token):
+        """El mapa en vivo siempre muestra el punto de encuentro (SENATI Independencia)."""
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        r = client.get("/api/v1/locations/map", headers=headers)
+        assert r.status_code == 200
+        assert "Punto de encuentro" in r.text
+        assert "SENATI Sede Central" in r.text
 
     def test_history_map_zooms_to_worker(self, client, admin_token):
         headers = {"Authorization": f"Bearer {admin_token}"}
