@@ -40,7 +40,8 @@ def main() -> int:
     check("GET /auth/me", r.status_code == 200 and r.json()["dni"] == "12345678", r.text[:150])
 
     r = client.get("/companies/1/branches")
-    check("4 sucursales", r.status_code == 200 and len(r.json()) == 4, r.text[:150])
+    branches_total = len(r.json()) if r.status_code == 200 else 0
+    check("4 sucursales", r.status_code == 200 and branches_total == 4, r.text[:150])
 
     r = client.get("/companies/1/products")
     check("8 productos", r.status_code == 200 and len(r.json()) == 8, str(len(r.json())))
@@ -253,6 +254,11 @@ def main() -> int:
     print(f"\n{len(results) - len(fails)}/{len(results)} verificaciones OK")
     if fails:
         print("FALLAS:", ", ".join(fails))
+        if branches_total == 0:
+            print(
+                "SIN DATOS DEMO: la verificación completa requiere el escenario demo "
+                "(ejecuta `python -m app.seed_demo` sobre una base local SQLite)."
+            )
         return 1
     return 0
 

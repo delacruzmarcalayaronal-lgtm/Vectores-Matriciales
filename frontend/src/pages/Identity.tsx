@@ -294,8 +294,8 @@ export function Identity() {
           const autoActive = state.faceRegistered && !state.manual;
           setScanMsg(
             autoActive
-              ? `${GEOM_POINTS} puntos · ojos, nariz y boca detectados · identificándote automáticamente…`
-              : `${GEOM_POINTS} puntos · ojos, nariz y boca detectados · listo para capturar`,
+              ? `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · identificándote automáticamente…`
+              : `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · listo para capturar`,
           );
           if (autoActive && !autoBusyRef.current && Date.now() - autoLastRef.current >= 2500) {
             autoLastRef.current = Date.now();

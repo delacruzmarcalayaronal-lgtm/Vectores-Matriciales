@@ -30,3 +30,6 @@ backend/.env
 
 # Secrets locales
 .env*
+
+# Ejemplos de variables de entorno (placeholders, sin secrets)
+!.env.example

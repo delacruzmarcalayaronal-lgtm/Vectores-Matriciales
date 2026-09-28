@@ -14,7 +14,7 @@ cp .env.example .env
 python -m uvicorn app.main:app --port 8000
 ```
 
-Al arrancar ejecuta las migraciones de Alembic (`migrations/`) y siembra los datos demo si la base está vacía.
+Al arrancar ejecuta las migraciones de Alembic (`migrations/`) y siembra los datos base (empresa + usuarios) si la base está vacía. El escenario demo completo (sucursales, productos, ventas, vectores y matrices) es opcional: `python -m app.seed_demo`.
 
 ## Estructura
 
@@ -33,15 +33,15 @@ backend/
 │   ├── main.py            # App FastAPI
 │   └── seed.py            # Datos demo
 ├── migrations/            # Alembic
-├── tests/                 # pytest (51 tests)
+├── tests/                 # pytest (90 tests)
 └── requirements.txt
 ```
 
 ## Pruebas
 
 ```bash
-python -m pytest -q          # 51 tests
-python smoke_test.py         # verificación API en vivo
+python -m pytest -q          # 90 tests
+python smoke_test.py         # verificación API en vivo (44 checks; con datos demo: python -m app.seed_demo)
 ```
 
 ## Login demo

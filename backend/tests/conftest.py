@@ -35,6 +35,14 @@ def client():
     from app.main import app
 
     with TestClient(app) as test_client:
+        from app.core.database import SessionLocal
+        from app.seed_demo import seed_demo
+
+        db = SessionLocal()
+        try:
+            seed_demo(db)
+        finally:
+            db.close()
         yield test_client
     _dispose_engine()
     _fresh_db()

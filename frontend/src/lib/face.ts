@@ -228,17 +228,15 @@ export function clampThreshold(value?: number | null, fallback?: number | null):
 }
 
 /*Índices del mesh (MediaPipe FaceLandmarker, 478 puntos) que dibujan la
-  estructura facial: contorno, ojos, nariz, boca y pupilas. */
-const FACE_OVAL = [
-  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
-  152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
-];
+  estructura facial: ojos, nariz, boca y pupilas. */
 const LEFT_EYE = [246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7, 33];
 const RIGHT_EYE = [466, 388, 387, 386, 385, 384, 398, 382, 381, 380, 374, 373, 390, 249, 263, 362];
 const NOSE_LINE = [168, 6, 197, 195, 5, 4, 1];
+const NOSE_BASE = [64, 48, 1, 305, 438];
 const MOUTH_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
 const MOUTH_INNER = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
-const IRIS = [468, 473];
+const LEFT_IRIS = [468, 469, 470, 471, 472];
+const RIGHT_IRIS = [473, 474, 475, 476, 477];
 
 function strokePath(
   ctx: CanvasRenderingContext2D,
@@ -265,6 +263,75 @@ function strokePath(
   return drew;
 }
 
+function fillPath(
+  ctx: CanvasRenderingContext2D,
+  landmarks: FacePoint[],
+  indices: number[],
+  width: number,
+  height: number,
+): boolean {
+  let drew = false;
+  ctx.beginPath();
+  for (const index of indices) {
+    const point = landmarks[index];
+    if (!point) continue;
+    const x = point.x * width;
+    const y = point.y * height;
+    if (!drew) {
+      ctx.moveTo(x, y);
+      drew = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  if (drew) {
+    ctx.closePath();
+    ctx.fill();
+  }
+  return drew;
+}
+
+/* Rotación de cabeza (yaw) aproximada: desplazamiento horizontal de la punta
+  de la nariz respecto al centro de los ojos, normalizado por la distancia
+  interpupilar. ±FRONTAL_GIRO_LIMIT ≈ ±20° todavía considerado "de frente". */
+export const FRONTAL_GIRO_LIMIT = 0.22;
+
+export function estimateGiro(landmarks: FacePoint[]): number {
+  const left = landmarks[33];
+  const right = landmarks[263];
+  const nose = landmarks[1];
+  if (!left || !right || !nose) return 0;
+  const dist = Math.hypot(right.x - left.x, right.y - left.y);
+  if (dist < 1e-4) return 0;
+  return (nose.x - (left.x + right.x) / 2) / dist;
+}
+
+/* Paleta de profundidad del overlay: lo lejano en cian, la superficie en
+  verde y el relieve (frente, mentón, labios) en ámbar/naranja. */
+const DEPTH_STOPS: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
+  [0, [6, 182, 212]],
+  [0.4, [34, 197, 94]],
+  [0.7, [250, 204, 21]],
+  [1, [249, 115, 22]],
+];
+
+function depthColor(t: number): string {
+  const stops = DEPTH_STOPS;
+  let from = stops[0];
+  let to = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    if (t >= stops[i][0] && t <= stops[i + 1][0]) {
+      from = stops[i];
+      to = stops[i + 1];
+      break;
+    }
+  }
+  const span = to[0] - from[0] || 1;
+  const k = Math.max(0, Math.min(1, (t - from[0]) / span));
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * k);
+  return `rgb(${mix(from[1][0], to[1][0])}, ${mix(from[1][1], to[1][1])}, ${mix(from[1][2], to[1][2])})`;
+}
+
 export function drawFaceOverlay(
   canvas: HTMLCanvasElement,
   hit: FaceHit | null,
@@ -278,62 +345,101 @@ export function drawFaceOverlay(
   if (!hit) return;
 
   const landmarks = hit.landmarks;
-  const color = options.stable ? '#22C55E' : '#06B6D4';
+  const stable = !!options.stable;
+  const glow = stable ? Math.max(6, width / 70) : 0;
 
-  // Contorno facial real (FACE_OVAL) con brillo suave
+  // Campo de puntos del mesh coloreado por profundidad (478 puntos)
+  let zMin = Infinity;
+  let zMax = -Infinity;
+  for (const point of landmarks) {
+    if (point.z < zMin) zMin = point.z;
+    if (point.z > zMax) zMax = point.z;
+  }
+  const zSpan = zMax - zMin || 1;
+  const baseRadius = Math.max(1.7, width / 330);
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(2, width / 220);
-  ctx.shadowColor = color;
-  ctx.shadowBlur = Math.max(6, width / 60);
-  strokePath(ctx, landmarks, FACE_OVAL, width, height);
+  ctx.globalAlpha = 0.92;
+  for (const point of landmarks) {
+    const t = (zMax - point.z) / zSpan;
+    ctx.fillStyle = depthColor(t);
+    ctx.beginPath();
+    ctx.arc(point.x * width, point.y * height, baseRadius * (0.75 + 0.7 * t), 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 
-  // Estructura interna: ojos, nariz y boca
+  // Guía nasal: puntos verdes de la dorsal y de la base de la nariz
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.9;
-  ctx.lineWidth = Math.max(1.3, width / 340);
-  strokePath(ctx, landmarks, LEFT_EYE, width, height);
-  strokePath(ctx, landmarks, RIGHT_EYE, width, height);
-  strokePath(ctx, landmarks, NOSE_LINE, width, height);
+  ctx.fillStyle = '#22C55E';
+  if (stable) {
+    ctx.shadowColor = '#22C55E';
+    ctx.shadowBlur = glow;
+  }
+  const noseRadius = Math.max(3, width / 95);
+  for (const index of [...NOSE_LINE, ...NOSE_BASE]) {
+    const point = landmarks[index];
+    if (!point) continue;
+    ctx.beginPath();
+    ctx.arc(point.x * width, point.y * height, noseRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Boca: relleno naranja translúcido + contorno
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 152, 0, 0.38)';
+  fillPath(ctx, landmarks, MOUTH_OUTER, width, height);
+  ctx.strokeStyle = '#FF9800';
+  ctx.lineWidth = Math.max(1.8, width / 240);
+  ctx.lineJoin = 'round';
+  if (stable) {
+    ctx.shadowColor = '#FF9800';
+    ctx.shadowBlur = glow;
+  }
   strokePath(ctx, landmarks, MOUTH_OUTER, width, height);
+  ctx.strokeStyle = '#FFB74D';
+  ctx.lineWidth = Math.max(1.2, width / 360);
   strokePath(ctx, landmarks, MOUTH_INNER, width, height);
   ctx.restore();
 
-  // Pupilas (iris cuando el modelo trae 478 puntos)
-  const pupilRadius = Math.max(2.2, width / 150);
-  for (const index of IRIS) {
-    const point = landmarks[index];
-    if (!point) continue;
-    const x = point.x * width;
-    const y = point.y * height;
-    ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(x, y, pupilRadius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, pupilRadius * 0.55, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Campo de puntos de profundidad
-  const step = landmarks.length > GEOM_POINTS ? landmarks.length / GEOM_POINTS : 1;
-  const radius = Math.max(1.6, width / 320);
+  // Ojos: relleno rojo translúcido, contorno rojo y anillo de iris
   ctx.save();
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.85;
-  for (let i = 0; i < GEOM_POINTS; i += 1) {
-    const point = landmarks[Math.floor(i * step)];
-    if (!point) continue;
-    ctx.beginPath();
-    ctx.arc(point.x * width, point.y * height, radius, 0, Math.PI * 2);
-    ctx.fill();
+  ctx.fillStyle = 'rgba(255, 61, 58, 0.42)';
+  fillPath(ctx, landmarks, LEFT_EYE, width, height);
+  fillPath(ctx, landmarks, RIGHT_EYE, width, height);
+  ctx.strokeStyle = '#FF3B30';
+  ctx.lineWidth = Math.max(1.8, width / 230);
+  ctx.lineJoin = 'round';
+  if (stable) {
+    ctx.shadowColor = '#FF3B30';
+    ctx.shadowBlur = glow;
+  }
+  strokePath(ctx, landmarks, LEFT_EYE, width, height);
+  strokePath(ctx, landmarks, RIGHT_EYE, width, height);
+  ctx.shadowBlur = 0;
+  const irisRadius = Math.max(1.6, width / 300);
+  const irisCenterRadius = Math.max(2, width / 200);
+  for (const set of [LEFT_IRIS, RIGHT_IRIS]) {
+    ctx.fillStyle = '#FF6B6B';
+    let cx = 0;
+    let cy = 0;
+    let count = 0;
+    for (const index of set) {
+      const point = landmarks[index];
+      if (!point) continue;
+      ctx.beginPath();
+      ctx.arc(point.x * width, point.y * height, irisRadius, 0, Math.PI * 2);
+      ctx.fill();
+      cx += point.x;
+      cy += point.y;
+      count += 1;
+    }
+    if (count) {
+      ctx.fillStyle = '#F43F5E';
+      ctx.beginPath();
+      ctx.arc((cx / count) * width, (cy / count) * height, irisCenterRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }

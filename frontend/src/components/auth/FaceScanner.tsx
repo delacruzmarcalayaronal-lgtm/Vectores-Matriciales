@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, CheckCircle2, Loader2, RefreshCw, ScanFace, ShieldAlert, Target } from 'lucide-react';
-import { buildDescriptor, detectFace, drawFaceOverlay, GEOM_POINTS, type FaceHit } from '../../lib/face';
+import { buildDescriptor, detectFace, drawFaceOverlay, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
 
 export interface FaceScanResult {
   vector: number[] | null;
@@ -29,11 +29,13 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
   const stableRef = useRef(0);
   const startedRef = useRef(0);
   const busyRef = useRef(false);
+  const framesRef = useRef(0);
 
   const [status, setStatus] = useState<ScanStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [hint, setHint] = useState('Activa la cámara para validar tu identidad');
   const [showDemo, setShowDemo] = useState(false);
+  const [hud, setHud] = useState({ points: 0, frames: 0, giro: 0 });
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -103,6 +105,12 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           return;
         }
         hitRef.current = hit;
+        if (hit) {
+          framesRef.current += 1;
+          setHud({ points: hit.landmarks.length, frames: framesRef.current, giro: estimateGiro(hit.landmarks) });
+        } else {
+          setHud(prev => ({ points: 0, frames: prev.frames, giro: 0 }));
+        }
         let smoothBox: FaceHit['box'] | undefined;
         if (hit) {
           const prev = smoothBoxRef.current;
@@ -176,6 +184,8 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
       stableRef.current = 0;
       smoothBoxRef.current = null;
       startedRef.current = Date.now();
+      framesRef.current = 0;
+      setHud({ points: 0, frames: 0, giro: 0 });
       setStatus('scanning');
       setProgress(0);
       setHint('Buscando el rostro… coloca tu rostro frente a la cámara');
@@ -227,6 +237,8 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
     stableRef.current = 0;
     hitRef.current = null;
     smoothBoxRef.current = null;
+    framesRef.current = 0;
+    setHud({ points: 0, frames: 0, giro: 0 });
     setStatus('idle');
     setProgress(0);
     setHint('Activa la cámara para validar tu identidad');
@@ -265,7 +277,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           <p className="text-sm font-medium text-text">
             {status === 'idle' && 'Escaneo facial'}
             {status === 'requesting' && 'Solicitando acceso a la cámara…'}
-            {status === 'scanning' && (engineScan ? `Detección con ${GEOM_POINTS} puntos` : 'Verificando rostro (demo)…')}
+            {status === 'scanning' && (engineScan ? `Detección con ${hud.points || GEOM_POINTS} puntos` : 'Verificando rostro (demo)…')}
             {status === 'success' && 'Rostro verificado'}
             {status === 'denied' && 'Cámara no disponible'}
             {status === 'error' && 'Motor de detección no disponible'}
@@ -291,10 +303,41 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
             <Camera className="w-10 h-10 text-white/30" />
           </div>
         )}
-        {scanning && (
+        {scanning && !engineScan && (
           <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/50 text-white text-[11px]">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            {engineScan ? `${GEOM_POINTS} PUNTOS` : 'DEMO'}
+            DEMO
+          </div>
+        )}
+        {engineScan && (
+          <div
+            className="absolute top-2 left-2 rounded-md bg-black/55 px-2.5 py-1.5 text-white text-[11px] leading-tight"
+            data-testid="face-hud-stats"
+          >
+            <p className="flex items-center gap-1.5 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+              {hud.points} puntos activos
+            </p>
+            <p className="text-white/85">Frames: {hud.frames}</p>
+            <p className="text-white/85">
+              Giro: {hud.giro >= 0 ? '+' : ''}
+              {hud.giro.toFixed(2)} (gira a ±{FRONTAL_GIRO_LIMIT.toFixed(2)})
+            </p>
+          </div>
+        )}
+        {engineScan && (
+          <div
+            className="absolute top-2 right-2 rounded-lg bg-black/60 px-3 py-1.5 text-center"
+            data-testid="face-hud-frontal"
+          >
+            <p className="text-cyan-300 font-bold text-[11px] tracking-wide">DE FRENTE</p>
+            <p className="text-white font-extrabold text-base leading-tight">{Math.round(progress)}%</p>
+          </div>
+        )}
+        {engineScan && (
+          <div className="absolute inset-x-0 bottom-2 z-10 px-2 text-center text-white text-xs font-semibold drop-shadow-md">
+            <p>Mira de frente y pulsa Capturar</p>
+            <p className="text-[11px] font-normal text-white/75">Escaneando frontal</p>
           </div>
         )}
         {engineScan && <div className="scanline" aria-hidden="true" />}

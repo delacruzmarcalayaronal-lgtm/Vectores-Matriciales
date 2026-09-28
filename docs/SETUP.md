@@ -27,7 +27,7 @@ cp .env.example .env
 python -m uvicorn app.main:app --port 8000
 ```
 
-Con `DATABASE_URL=sqlite:///./matrixflow.db` (default) la base y los datos demo se crean automáticamente.
+Con `DATABASE_URL=sqlite:///./matrixflow.db` (default) la base y los datos base (empresa + usuarios) se crean automáticamente. Para cargar además el escenario demo completo (sucursales, productos, ventas y vectores): `python -m app.seed_demo`.
 
 ### 2. Frontend
 
@@ -42,7 +42,7 @@ Abre http://localhost:5173
 ### 3. Verificación
 
 ```bash
-cd backend && python -m pytest -q    # 51 tests
+cd backend && python -m pytest -q    # 90 tests
 cd frontend && npm run build         # typecheck + build
 ```
 
