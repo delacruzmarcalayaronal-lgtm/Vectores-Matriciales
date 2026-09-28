@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Plus, Search, Edit, Trash2, Copy, Download, Eye, Minus, Plus as PlusIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Copy, Download, Eye, Minus, Plus as PlusIcon, Boxes } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
-import { Card, CardContent } from '../components/ui/Card';
 import { Table, Badge, Modal } from '../components/ui/Table';
+import { PageHero } from '../components/ui/PageHero';
 import { useMatrices, useCreateMatrix, useUpdateMatrix, useDeleteMatrix } from '../hooks/useApi';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,12 +52,26 @@ export function Matrices() {
     setValue('colLabels', newColLabels);
   }, [setValue]);
 
+  const resizeGrid = (rows: number, cols: number) => {
+    const newValues = Array.from({ length: rows }, (_, i) =>
+      Array.from({ length: cols }, (_, j) => gridValues[i]?.[j] ?? 0),
+    );
+    const newRowLabels = Array.from({ length: rows }, (_, i) => gridRowLabels[i] ?? `Fila ${i + 1}`);
+    const newColLabels = Array.from({ length: cols }, (_, j) => gridColLabels[j] ?? `Col ${j + 1}`);
+    setGridRows(rows);
+    setGridCols(cols);
+    setGridValues(newValues);
+    setGridRowLabels(newRowLabels);
+    setGridColLabels(newColLabels);
+    setValue('values', newValues);
+    setValue('rowLabels', newRowLabels);
+    setValue('colLabels', newColLabels);
+  };
+
   const applyDims = (rows: number, cols: number) => {
     if (!Number.isInteger(rows) || !Number.isInteger(cols)) return;
     if (rows < 1 || cols < 1 || rows > 50 || cols > 50) return;
-    setGridRows(rows);
-    setGridCols(cols);
-    initializeGrid(rows, cols);
+    resizeGrid(rows, cols);
   };
 
   const updateCellValue = (row: number, col: number, value: number) => {
@@ -84,41 +98,65 @@ export function Matrices() {
 
   const addRow = () => {
     if (gridRows >= 50) return;
-    const newRow = Array(gridCols).fill(0);
-    setGridValues([...gridValues, newRow]);
-    setGridRowLabels([...gridRowLabels, `Fila ${gridRows + 1}`]);
+    const newValues = [...gridValues, Array(gridCols).fill(0)];
+    const newLabels = [...gridRowLabels, `Fila ${gridRows + 1}`];
+    setGridValues(newValues);
+    setGridRowLabels(newLabels);
     setGridRows(gridRows + 1);
     setValue('rows', gridRows + 1);
+    setValue('values', newValues);
+    setValue('rowLabels', newLabels);
   };
 
   const removeRow = () => {
     if (gridRows <= 1) return;
-    setGridValues(gridValues.slice(0, -1));
-    setGridRowLabels(gridRowLabels.slice(0, -1));
+    const newValues = gridValues.slice(0, -1);
+    const newLabels = gridRowLabels.slice(0, -1);
+    setGridValues(newValues);
+    setGridRowLabels(newLabels);
     setGridRows(gridRows - 1);
     setValue('rows', gridRows - 1);
+    setValue('values', newValues);
+    setValue('rowLabels', newLabels);
   };
 
   const addCol = () => {
     if (gridCols >= 50) return;
-    setGridValues(gridValues.map(row => [...row, 0]));
-    setGridColLabels([...gridColLabels, `Col ${gridCols + 1}`]);
+    const newValues = gridValues.map(row => [...row, 0]);
+    const newLabels = [...gridColLabels, `Col ${gridCols + 1}`];
+    setGridValues(newValues);
+    setGridColLabels(newLabels);
     setGridCols(gridCols + 1);
     setValue('cols', gridCols + 1);
+    setValue('values', newValues);
+    setValue('colLabels', newLabels);
   };
 
   const removeCol = () => {
     if (gridCols <= 1) return;
-    setGridValues(gridValues.map(row => row.slice(0, -1)));
-    setGridColLabels(gridColLabels.slice(0, -1));
+    const newValues = gridValues.map(row => row.slice(0, -1));
+    const newLabels = gridColLabels.slice(0, -1);
+    setGridValues(newValues);
+    setGridColLabels(newLabels);
     setGridCols(gridCols - 1);
     setValue('cols', gridCols - 1);
+    setValue('values', newValues);
+    setValue('colLabels', newLabels);
   };
 
   const filteredMatrices = matrices?.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.description?.toLowerCase().includes(search.toLowerCase())
   ) || [];
+
+  const maxMatrixDims = filteredMatrices.reduce(
+    (acc, m) => ({
+      rows: Math.max(acc.rows, m.rows),
+      cols: Math.max(acc.cols, m.cols),
+    }),
+    { rows: 0, cols: 0 },
+  );
+  const totalCells = filteredMatrices.reduce((sum, m) => sum + m.rows * m.cols, 0);
 
   const openCreateModal = () => {
     setEditingMatrix(null);
@@ -131,19 +169,26 @@ export function Matrices() {
 
   const openEditModal = (matrix: Matrix) => {
     setEditingMatrix(matrix);
-    setGridRows(matrix.rows);
-    setGridCols(matrix.cols);
-    setGridValues(matrix.values);
-    setGridRowLabels(matrix.rowLabels);
-    setGridColLabels(matrix.colLabels);
+    const rows = Math.max(1, matrix.rows || matrix.values.length || 1);
+    const cols = Math.max(1, matrix.cols || matrix.values[0]?.length || 1);
+    const values = Array.from({ length: rows }, (_, i) =>
+      Array.from({ length: cols }, (_, j) => matrix.values?.[i]?.[j] ?? 0),
+    );
+    const rowLabels = Array.from({ length: rows }, (_, i) => matrix.rowLabels?.[i] ?? `Fila ${i + 1}`);
+    const colLabels = Array.from({ length: cols }, (_, j) => matrix.colLabels?.[j] ?? `Col ${j + 1}`);
+    setGridRows(rows);
+    setGridCols(cols);
+    setGridValues(values);
+    setGridRowLabels(rowLabels);
+    setGridColLabels(colLabels);
     reset({
       name: matrix.name,
       description: matrix.description,
-      rows: matrix.rows,
-      cols: matrix.cols,
-      rowLabels: matrix.rowLabels,
-      colLabels: matrix.colLabels,
-      values: matrix.values,
+      rows,
+      cols,
+      rowLabels,
+      colLabels,
+      values,
       source: matrix.source,
     });
     setIsModalOpen(true);
@@ -164,6 +209,7 @@ export function Matrices() {
       refetch();
     } catch (error) {
       console.error('Error saving matrix:', error);
+      show('No se pudo guardar la matriz. Revisa las dimensiones y los valores.');
     }
   };
 
@@ -252,31 +298,40 @@ export function Matrices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Matrices</h1>
-          <p className="text-secondary mt-1">Gestión de matrices para análisis multidimensional</p>
-        </div>
-        <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
-          Nueva Matriz
-        </Button>
-      </div>
+      <PageHero
+        icon={<Boxes className="w-6 h-6" />}
+        title="Matrices"
+        subtitle="Gestión de matrices para análisis multidimensional"
+        action={
+          <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />} className="shadow-sm">
+            Nueva Matriz
+          </Button>
+        }
+        stats={[
+          { label: 'Matrices', value: filteredMatrices.length },
+          { label: 'Mayor dimensión', value: filteredMatrices.length ? `${maxMatrixDims.rows} × ${maxMatrixDims.cols}` : '—' },
+          { label: 'Celdas', value: totalCells },
+        ]}
+      />
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="p-4 border-b border-border">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-              <input
-                type="text"
-                placeholder="Buscar matriz..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
+      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-gradient-to-r from-primary/10 to-transparent flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Boxes className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold text-text">Matrices registradas</h2>
+            <Badge variant="primary" size="sm">{filteredMatrices.length}</Badge>
           </div>
-
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+            <input
+              type="text"
+              placeholder="Buscar matriz..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+        </div>
           <Table
             data={filteredMatrices}
             columns={[
@@ -297,35 +352,35 @@ export function Matrices() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => openViewModal(row)}
-                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
                     aria-label="Ver detalles"
                   >
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => openEditModal(row)}
-                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
                     aria-label="Editar"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => copyToClipboard(row.values)}
-                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
                     aria-label="Copiar"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => downloadMatrix(row)}
-                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
                     aria-label="Descargar"
                   >
                     <Download className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => { setDeletingMatrix(row); }}
-                    className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
                     aria-label="Eliminar"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -337,8 +392,7 @@ export function Matrices() {
             isLoading={isLoading}
             emptyMessage="No se encontraron matrices"
           />
-        </CardContent>
-      </Card>
+      </div>
 
       <Modal
         isOpen={isModalOpen}
@@ -364,14 +418,19 @@ export function Matrices() {
             ]}
           />
 
-          <div className="border border-border rounded-lg overflow-hidden">
-            <div className="p-3 bg-gray-50 border-b border-border flex items-center justify-between">
-              <h4 className="font-medium text-text">Editor de Matriz</h4>
+          <div className="border border-border rounded-xl overflow-hidden">
+            <div className="p-3 bg-gradient-to-r from-primary/10 to-transparent border-b border-border flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={addRow} leftIcon={<PlusIcon className="w-3 h-3" />}>Fila</Button>
-                <Button variant="ghost" size="sm" onClick={removeRow} leftIcon={<Minus className="w-3 h-3" />}>Fila</Button>
-                <Button variant="ghost" size="sm" onClick={addCol} leftIcon={<PlusIcon className="w-3 h-3" />}>Col</Button>
-                <Button variant="ghost" size="sm" onClick={removeCol} leftIcon={<Minus className="w-3 h-3" />}>Col</Button>
+                <h4 className="font-semibold text-text">Editor de Matriz</h4>
+                <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">
+                  {gridRows} × {gridCols}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" onClick={addRow} aria-label="Añadir fila" leftIcon={<PlusIcon className="w-3 h-3" />}>Fila</Button>
+                <Button variant="outline" size="sm" onClick={removeRow} aria-label="Quitar fila" leftIcon={<Minus className="w-3 h-3" />}>Fila</Button>
+                <Button variant="outline" size="sm" onClick={addCol} aria-label="Añadir columna" leftIcon={<PlusIcon className="w-3 h-3" />}>Col</Button>
+                <Button variant="outline" size="sm" onClick={removeCol} aria-label="Quitar columna" leftIcon={<Minus className="w-3 h-3" />}>Col</Button>
               </div>
             </div>
             <div className="p-3 overflow-auto max-h-[400px]">
@@ -380,12 +439,13 @@ export function Matrices() {
                   <tr>
                     <th className="p-2 border border-border bg-gray-100 w-32"></th>
                     {gridColLabels.map((label, j) => (
-                      <th key={j} className="p-2 border border-border bg-gray-100 min-w-[80px]">
+                      <th key={j} className="p-1.5 border border-border bg-gray-100 min-w-[80px]">
                         <input
                           type="text"
                           value={label}
                           onChange={e => updateColLabel(j, e.target.value)}
-                          className="w-full px-2 py-1 text-xs border border-transparent bg-white rounded text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                          aria-label={`Etiqueta de columna ${j + 1}`}
+                          className="w-full px-2 py-1 text-xs border border-transparent bg-white rounded-md text-center font-semibold text-primary focus:outline-none focus:ring-1 focus:ring-primary hover:border-border"
                         />
                       </th>
                     ))}
@@ -394,12 +454,13 @@ export function Matrices() {
                 <tbody>
                   {gridValues.map((row, i) => (
                     <tr key={i}>
-                      <th className="p-2 border border-border bg-gray-100 w-32">
+                      <th className="p-1.5 border border-border bg-gray-100 w-32">
                         <input
                           type="text"
-                          value={gridRowLabels[i]}
+                          value={gridRowLabels[i] ?? ''}
                           onChange={e => updateRowLabel(i, e.target.value)}
-                          className="w-full px-2 py-1 text-xs border border-transparent bg-white rounded text-center focus:outline-none focus:ring-1 focus:ring-primary"
+                          aria-label={`Etiqueta de fila ${i + 1}`}
+                          className="w-full px-2 py-1 text-xs border border-transparent bg-white rounded-md text-center font-semibold text-primary focus:outline-none focus:ring-1 focus:ring-primary hover:border-border"
                         />
                       </th>
                       {row.map((val, j) => (
@@ -409,7 +470,8 @@ export function Matrices() {
                             step="any"
                             value={val}
                             onChange={e => updateCellValue(i, j, parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1 text-sm border border-transparent bg-white rounded text-right focus:outline-none focus:ring-1 focus:ring-primary"
+                            aria-label={`Valor fila ${i + 1} columna ${j + 1}`}
+                            className="w-full px-2 py-1 text-sm border border-transparent bg-white rounded-md text-right font-mono focus:outline-none focus:ring-1 focus:ring-primary hover:border-border"
                           />
                         </td>
                       ))}
@@ -418,6 +480,11 @@ export function Matrices() {
                 </tbody>
               </table>
             </div>
+            {(errors.values || errors.rowLabels || errors.colLabels) && (
+              <p className="px-3 pb-3 text-sm text-danger">
+                {errors.values?.message || errors.rowLabels?.message || errors.colLabels?.message}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

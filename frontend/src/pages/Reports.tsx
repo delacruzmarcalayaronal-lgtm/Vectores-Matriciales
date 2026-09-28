@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   BarChart,
@@ -50,6 +50,7 @@ export function Reports() {
   const [editingTarget, setEditingTarget] = useState<Target | null>(null);
   const [deletingTarget, setDeletingTarget] = useState<Target | null>(null);
   const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
+  const [printAll, setPrintAll] = useState(false);
 
   const { user } = useAuth();
   const { show, notice } = useNotice();
@@ -84,6 +85,21 @@ export function Reports() {
   const handlePrint = () => {
     window.print();
   };
+
+  const handlePrintAll = () => {
+    setPrintAll(true);
+  };
+
+  useEffect(() => {
+    if (!printAll) return;
+    const onAfterPrint = () => setPrintAll(false);
+    window.addEventListener('afterprint', onAfterPrint);
+    const timer = window.setTimeout(() => window.print(), 500);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', onAfterPrint);
+    };
+  }, [printAll]);
 
   const handleExportPdf = () => {
     const previousTitle = document.title;
@@ -217,6 +233,9 @@ export function Reports() {
           <Button variant="outline" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint}>
             Imprimir
           </Button>
+          <Button leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrintAll}>
+            Imprimir todo
+          </Button>
         </div>
       </div>
 
@@ -264,7 +283,9 @@ export function Reports() {
         </nav>
       </div>
 
-      {activeTab === 'overview' && (
+      {(printAll || activeTab === 'overview') && (
+        <section className="print-report-section">
+          <h2 className="print-report-title">Resumen</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print-charts-grid">
           <Card className="print-chart-page">
             <CardHeader>
@@ -355,9 +376,12 @@ export function Reports() {
             </CardContent>
           </Card>
         </div>
+        </section>
       )}
 
-      {activeTab === 'sales' && (
+      {(printAll || activeTab === 'sales') && (
+        <section className="print-report-section">
+          <h2 className="print-report-title">Ventas</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -395,9 +419,12 @@ export function Reports() {
             </CardContent>
           </Card>
         </div>
+        </section>
       )}
 
-      {activeTab === 'targets' && (
+      {(printAll || activeTab === 'targets') && (
+        <section className="print-report-section">
+          <h2 className="print-report-title">Metas</h2>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Cumplimiento de Metas Detallado</CardTitle>
@@ -449,9 +476,12 @@ export function Reports() {
             />
           </CardContent>
         </Card>
+        </section>
       )}
 
-      {activeTab === 'inventory' && (
+      {(printAll || activeTab === 'inventory') && (
+        <section className="print-report-section">
+          <h2 className="print-report-title">Inventario</h2>
         <Card>
           <CardHeader>
             <CardTitle>Rotación de Inventario</CardTitle>
@@ -474,9 +504,12 @@ export function Reports() {
             />
           </CardContent>
         </Card>
+        </section>
       )}
 
-      {activeTab === 'operations' && (
+      {(printAll || activeTab === 'operations') && (
+        <section className="print-report-section">
+          <h2 className="print-report-title">Operaciones</h2>
         <Card>
           <CardHeader>
             <CardTitle>Resultados de Operaciones Matemáticas</CardTitle>
@@ -500,6 +533,7 @@ export function Reports() {
             />
           </CardContent>
         </Card>
+        </section>
       )}
 
       <Modal

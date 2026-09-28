@@ -128,7 +128,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         }
         if (!hit) {
           stableRef.current = Math.max(0, stableRef.current - 1);
-          setHint('Buscando el rostro… coloca tu rostro dentro de la máscara ovalada');
+          setHint('Buscando el rostro… coloca tu rostro frente a la cámara');
           setProgress((stableRef.current / STABLE_REQUIRED) * 100);
           return;
         }
@@ -141,7 +141,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           stableRef.current += 1;
         } else {
           stableRef.current = Math.max(0, stableRef.current - 1);
-          setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Centra tu rostro en la máscara ovalada');
+          setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Centra tu rostro frente a la cámara');
         }
         setProgress((stableRef.current / STABLE_REQUIRED) * 100);
         if (stableRef.current >= STABLE_REQUIRED) {
@@ -178,7 +178,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
       startedRef.current = Date.now();
       setStatus('scanning');
       setProgress(0);
-      setHint('Buscando el rostro… coloca tu rostro dentro de la máscara ovalada');
+      setHint('Buscando el rostro… coloca tu rostro frente a la cámara');
       scanLoop();
     } catch {
       setStatus('denied');
@@ -236,6 +236,8 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
 
   const scanning = status === 'scanning';
   const engineScan = scanning && !hint.startsWith('Verificando rostro (demo)');
+  const progressLabel =
+    status === 'success' ? 'Escaneo completo' : scanning ? 'Escaneando…' : 'Escanear';
 
   return (
     <div
@@ -295,22 +297,28 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
             {engineScan ? `${GEOM_POINTS} PUNTOS` : 'DEMO'}
           </div>
         )}
+        {engineScan && <div className="scanline" aria-hidden="true" />}
       </div>
 
-      {scanning && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-xs text-secondary mb-1">
-            <span>{engineScan ? 'Estabilizando el encuadre del rostro' : 'Validación de demostración'}</span>
-            <span>{Math.round(progress)}%</span>
-          </div>
-          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-100"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span
+            className={`inline-flex items-center gap-1.5 font-medium ${
+              scanning ? 'text-primary' : status === 'success' ? 'text-success' : 'text-secondary'
+            }`}
+          >
+            {scanning && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+            {progressLabel}
+          </span>
+          <span className="text-secondary">{Math.round(progress)}%</span>
         </div>
-      )}
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-100 ${status === 'success' ? 'bg-success' : 'bg-primary'}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         {status === 'idle' && (

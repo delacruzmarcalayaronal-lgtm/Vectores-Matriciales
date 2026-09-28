@@ -4,6 +4,7 @@ import { Menu, ArrowLeft } from 'lucide-react';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { OnlineStatus } from './OnlineStatus';
+import { useAuth } from '../../contexts/useAuth';
 
 export function Header({
   onMenuClick,
@@ -16,6 +17,7 @@ export function Header({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const showBack = !hasSidebar && location.pathname !== '/dashboard';
 
   return (
@@ -49,6 +51,11 @@ export function Header({
       <div className="flex-1 flex items-center justify-between min-w-0">
         <h1 className="text-base sm:text-xl font-semibold text-white truncate">MatrixFlow Enterprise</h1>
         <div className="flex items-center gap-3 sm:gap-4">
+          {user && !hasSidebar && (
+            <span className="hidden md:block text-sm font-medium text-white truncate max-w-[180px]" title={user.name}>
+              {user.name}
+            </span>
+          )}
           <NotificationBell />
           <OnlineStatus className="hidden sm:flex" />
           {!hasSidebar && (

@@ -63,9 +63,16 @@ interface SidebarProps {
   onExpandedChange?: (expanded: boolean) => void;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  manager: 'Gerente',
+  analyst: 'Analista',
+  operator: 'Operador',
+};
+
 export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) {
   const location = useLocation();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const isDesktop = useIsDesktop();
   const [isHovered, setIsHovered] = useState(false);
   const expanded = !isDesktop || isHovered;
@@ -161,7 +168,19 @@ export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) 
       </nav>
 
       <div className="p-3 border-t border-white/10 relative">
-        <ProfileAvatar onClick={onNavigate} />
+        <div className="flex items-center gap-3">
+          <ProfileAvatar onClick={onNavigate} />
+          {expanded && user && (
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate" title={user.name}>
+                {user.name}
+              </p>
+              <p className="text-xs text-white/60 truncate">
+                {ROLE_LABELS[user.role] ?? user.role}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );

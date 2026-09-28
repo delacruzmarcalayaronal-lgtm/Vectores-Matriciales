@@ -10,6 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { Operation, OperationType } from '../types';
 import { operationSchema, type OperationForm } from '../schemas';
 import { operationTypes } from '../lib/operationTypes';
+import { PageHero } from '../components/ui/PageHero';
 
 export function Operations() {
   const [search, setSearch] = useState('');
@@ -123,6 +124,10 @@ export function Operations() {
     op.type.toLowerCase().includes(search.toLowerCase())
   ) || [];
 
+  const allOperations = operations?.data || [];
+  const completedCount = allOperations.filter(op => op.status === 'completed').length;
+  const failedCount = allOperations.filter(op => op.status === 'failed').length;
+
   const getTypeIcon = (type: OperationType) => {
     switch (type) {
       case 'vector_add': return <PlusIcon className="w-4 h-4" />;
@@ -150,22 +155,28 @@ export function Operations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Operaciones Matemáticas</h1>
-          <p className="text-secondary mt-1">Ejecuta operaciones de álgebra lineal sobre vectores y matrices</p>
-        </div>
-      </div>
+      <PageHero
+        icon={<Calculator className="w-6 h-6" />}
+        title="Operaciones Matemáticas"
+        subtitle="Ejecuta operaciones de álgebra lineal sobre vectores y matrices"
+        stats={[
+          { label: 'Operaciones', value: allOperations.length },
+          { label: 'Completadas', value: completedCount },
+          { label: 'Fallidas', value: failedCount },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="w-5 h-5" />
+        <Card className="lg:col-span-1" padding="none">
+          <CardHeader className="mb-0 p-5 bg-gradient-to-r from-primary/10 to-transparent border-b border-border">
+            <CardTitle className="flex items-center gap-2.5 text-base">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+                <Calculator className="w-4 h-4" />
+              </span>
               Nueva Operación
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-5 space-y-4">
             <form onSubmit={handleSubmit(onExecute)}>
               <Select
                 label="Tipo de Operación"
@@ -182,7 +193,7 @@ export function Operations() {
                   <label className="block text-sm font-medium text-text mb-2">Vectores ({selectedVectors.length}/{selectedTypeConfig.maxInputs || '∞'})</label>
                   <div className="space-y-2 max-h-48 overflow-auto">
                     {vectors?.map(v => (
-                      <label key={v.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-gray-50 cursor-pointer">
+                      <label key={v.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:bg-gray-50 hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5 cursor-pointer transition-colors">
                         <input
                           type="checkbox"
                           checked={selectedVectors.includes(v.id)}
@@ -204,7 +215,7 @@ export function Operations() {
                   <label className="block text-sm font-medium text-text mb-2">Matrices ({selectedMatrices.length}/{selectedTypeConfig.maxInputs || '∞'})</label>
                   <div className="space-y-2 max-h-48 overflow-auto">
                     {matrices?.map(m => (
-                      <label key={m.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-gray-50 cursor-pointer">
+                      <label key={m.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:bg-gray-50 hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5 cursor-pointer transition-colors">
                         <input
                           type="checkbox"
                           checked={selectedMatrices.includes(m.id)}
@@ -257,23 +268,24 @@ export function Operations() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <GitGraph className="w-5 h-5" />
-                Historial de Operaciones
-              </CardTitle>
-              <div className="relative max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-                <input
-                  type="text"
-                  placeholder="Buscar operación..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-                />
-              </div>
+        <Card className="lg:col-span-2" padding="none">
+          <CardHeader className="mb-0 px-5 py-4 bg-gradient-to-r from-primary/10 to-transparent border-b border-border flex flex-row items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2.5 text-base">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+                <GitGraph className="w-4 h-4" />
+              </span>
+              Historial de Operaciones
+              <Badge variant="primary" size="sm">{filteredOperations.length}</Badge>
+            </CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+              <input
+                type="text"
+                placeholder="Buscar operación..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-border rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -301,14 +313,14 @@ export function Operations() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setViewingOperation(row)}
-                      className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100 transition-colors"
+                      className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
                       aria-label="Ver detalle"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setDeletingOperation(row)}
-                      className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100 transition-colors"
+                      className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
                       aria-label="Eliminar"
                     >
                       <Trash2 className="w-4 h-4" />

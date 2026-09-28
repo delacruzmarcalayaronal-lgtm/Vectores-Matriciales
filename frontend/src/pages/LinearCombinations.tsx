@@ -9,6 +9,7 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { linearComboSchema, type LinearComboForm } from '../schemas';
 import { useNotice } from '../hooks/useNotice';
+import { PageHero } from '../components/ui/PageHero';
 
 export function LinearCombinations() {
   const [search, _setSearch] = useState('');
@@ -106,6 +107,10 @@ export function LinearCombinations() {
 
   const resultVector = getResultVector();
 
+  const firstSelectedVector = selectedVectors.length
+    ? (vectors || []).find(v => v.id === selectedVectors[0])
+    : undefined;
+
   const copyResult = async () => {
     if (resultVector) {
       try {
@@ -132,25 +137,33 @@ export function LinearCombinations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Combinaciones Lineales</h1>
-          <p className="text-secondary mt-1">Indicadores ponderados: Σ(αᵢ × vᵢ) para análisis empresarial</p>
-        </div>
-        <Button onClick={openModal} leftIcon={<Plus className="w-4 h-4" />}>
-          Nueva Combinación
-        </Button>
-      </div>
+      <PageHero
+        icon={<SlidersHorizontal className="w-6 h-6" />}
+        title="Combinaciones Lineales"
+        subtitle="Indicadores ponderados: Σ(αᵢ × vᵢ) para análisis empresarial"
+        action={
+          <Button onClick={openModal} leftIcon={<Plus className="w-4 h-4" />} className="shadow-sm">
+            Nueva Combinación
+          </Button>
+        }
+        stats={[
+          { label: 'Vectores', value: (vectors || []).length },
+          { label: 'Seleccionados', value: selectedVectors.length },
+          { label: 'Dimensión', value: firstSelectedVector?.dimension ?? '—' },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <SlidersHorizontal className="w-5 h-5" />
+        <Card className="lg:col-span-1" padding="none">
+          <CardHeader className="mb-0 p-5 bg-gradient-to-r from-primary/10 to-transparent border-b border-border">
+            <CardTitle className="flex items-center gap-2.5 text-base">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+                <SlidersHorizontal className="w-4 h-4" />
+              </span>
               Configuración
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-5 space-y-4">
             <form ref={formRef} onSubmit={handleSubmit(onSubmit)} id="lc-form">
               <Input label="Nombre" {...register('name')} error={errors.name?.message} placeholder="Indicador Ventas Ponderado" />
               <Input label="Descripción" {...register('description')} placeholder="Combinación ponderada de ventas por sucursal" />
@@ -159,7 +172,7 @@ export function LinearCombinations() {
                 <label className="block text-sm font-medium text-text mb-2">Vectores ({selectedVectors.length} seleccionados)</label>
                 <div className="space-y-2 max-h-64 overflow-auto">
                   {filteredVectors.map(v => (
-                    <label key={v.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-gray-50 cursor-pointer">
+                    <label key={v.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:bg-gray-50 hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={selectedVectors.includes(v.id)}
@@ -208,14 +221,16 @@ export function LinearCombinations() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5" />
+        <Card className="lg:col-span-2" padding="none">
+          <CardHeader className="mb-0 p-5 bg-gradient-to-r from-primary/10 to-transparent border-b border-border">
+            <CardTitle className="flex items-center gap-2.5 text-base">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+                <Target className="w-4 h-4" />
+              </span>
               Resultado de la Combinación Lineal
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-5">
             {resultVector ? (
               <div className="space-y-4">
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -279,7 +294,7 @@ export function LinearCombinations() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12 text-secondary">
+              <div className="rounded-xl border border-dashed border-border bg-gray-50 text-center py-12 text-secondary">
                 <Calculator className="w-16 h-16 mx-auto mb-4 opacity-30" />
                 <p className="text-lg font-medium">No hay resultado aún</p>
                 <p className="mt-1">Configura una combinación lineal y haz clic en "Calcular"</p>

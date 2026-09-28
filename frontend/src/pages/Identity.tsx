@@ -284,11 +284,11 @@ export function Identity() {
           drawFaceOverlay(overlay, hit, { smoothBox });
         }
         if (!hit) {
-          setScanMsg('Buscando el rostro… coloca tu rostro dentro de la máscara ovalada');
+          setScanMsg('Buscando el rostro… coloca tu rostro frente a la cámara');
         } else if (hit.box.width < 0.12) {
           setScanMsg('Acércate un poco a la cámara');
         } else if (Math.abs(hit.box.x + hit.box.width / 2 - 0.5) > 0.25) {
-          setScanMsg('Centra tu rostro en la máscara ovalada');
+          setScanMsg('Centra tu rostro frente a la cámara');
         } else {
           const state = liveStateRef.current;
           const autoActive = state.faceRegistered && !state.manual;

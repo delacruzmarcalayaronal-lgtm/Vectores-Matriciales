@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, Copy, Download, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Copy, Download, Eye, GitGraph } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input, Textarea, Select } from '../components/ui/Input';
-import { Card, CardContent } from '../components/ui/Card';
 import { Table, Badge, Modal } from '../components/ui/Table';
+import { PageHero } from '../components/ui/PageHero';
 import { useVectors, useCreateVector, useUpdateVector, useDeleteVector } from '../hooks/useApi';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,6 +42,11 @@ export function Vectors() {
     v.name.toLowerCase().includes(search.toLowerCase()) ||
     v.description?.toLowerCase().includes(search.toLowerCase())
   ) || [];
+
+  const totalComponents = filteredVectors.reduce((sum, v) => sum + v.values.length, 0);
+  const avgDimension = filteredVectors.length
+    ? Math.round(filteredVectors.reduce((sum, v) => sum + v.dimension, 0) / filteredVectors.length)
+    : 0;
 
   const parseValues = (input: string): number[] => {
     return input.split(/[\s,;]+/).filter(v => v.trim()).map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
@@ -129,37 +134,48 @@ export function Vectors() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Vectores</h1>
-          <p className="text-secondary mt-1">Gestión de vectores para análisis matemático empresarial</p>
-        </div>
-        <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
-          Nuevo Vector
-        </Button>
-      </div>
+      <PageHero
+        icon={<GitGraph className="w-6 h-6" />}
+        title="Vectores"
+        subtitle="Gestión de vectores para análisis matemático empresarial"
+        action={
+          <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />} className="shadow-sm">
+            Nuevo Vector
+          </Button>
+        }
+        stats={[
+          { label: 'Vectores', value: filteredVectors.length },
+          { label: 'Dim. promedio', value: avgDimension },
+          { label: 'Componentes', value: totalComponents },
+        ]}
+      />
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="p-4 border-b border-border">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-              <input
-                type="text"
-                placeholder="Buscar vector..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
+      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-gradient-to-r from-primary/10 to-transparent flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <GitGraph className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold text-text">Vectores registrados</h2>
+            <Badge variant="primary" size="sm">{filteredVectors.length}</Badge>
           </div>
-
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+            <input
+              type="text"
+              placeholder="Buscar vector..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+        </div>
           <Table
             data={filteredVectors}
             columns={[
               { key: 'name', header: 'Nombre' },
               { key: 'description', header: 'Descripción', render: (row) => row.description || '-' },
-              { key: 'dimension', header: 'Dimensión', render: (row) => <span className="font-mono">{row.dimension}</span> },
+              { key: 'dimension', header: 'Dimensión', render: (row) => (
+                <span className="font-mono text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md">{row.dimension}</span>
+              ) },
               { key: 'source', header: 'Origen', render: (row) => (
                 <Badge variant={
                   row.source === 'manual' ? 'default' :
@@ -178,35 +194,35 @@ export function Vectors() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => openViewModal(row)}
-                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
                     aria-label="Ver detalles"
                   >
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => openEditModal(row)}
-                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
                     aria-label="Editar"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => copyToClipboard(row.values)}
-                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
                     aria-label="Copiar valores"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => downloadVector(row)}
-                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
                     aria-label="Descargar"
                   >
                     <Download className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => { setDeletingVector(row); }}
-                    className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100 transition-colors"
+                    className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
                     aria-label="Eliminar"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -218,8 +234,7 @@ export function Vectors() {
             isLoading={isLoading}
             emptyMessage="No se encontraron vectores"
           />
-        </CardContent>
-      </Card>
+      </div>
 
       <Modal
         isOpen={isModalOpen}

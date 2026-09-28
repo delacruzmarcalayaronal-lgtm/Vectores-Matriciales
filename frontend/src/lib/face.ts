@@ -227,6 +227,44 @@ export function clampThreshold(value?: number | null, fallback?: number | null):
   return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, Math.round(result)));
 }
 
+/*Índices del mesh (MediaPipe FaceLandmarker, 478 puntos) que dibujan la
+  estructura facial: contorno, ojos, nariz, boca y pupilas. */
+const FACE_OVAL = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377,
+  152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
+];
+const LEFT_EYE = [246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7, 33];
+const RIGHT_EYE = [466, 388, 387, 386, 385, 384, 398, 382, 381, 380, 374, 373, 390, 249, 263, 362];
+const NOSE_LINE = [168, 6, 197, 195, 5, 4, 1];
+const MOUTH_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
+const MOUTH_INNER = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
+const IRIS = [468, 473];
+
+function strokePath(
+  ctx: CanvasRenderingContext2D,
+  landmarks: FacePoint[],
+  indices: number[],
+  width: number,
+  height: number,
+): boolean {
+  let drew = false;
+  ctx.beginPath();
+  for (const index of indices) {
+    const point = landmarks[index];
+    if (!point) continue;
+    const x = point.x * width;
+    const y = point.y * height;
+    if (!drew) {
+      ctx.moveTo(x, y);
+      drew = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  if (drew) ctx.stroke();
+  return drew;
+}
+
 export function drawFaceOverlay(
   canvas: HTMLCanvasElement,
   hit: FaceHit | null,
@@ -237,43 +275,65 @@ export function drawFaceOverlay(
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
-  const box = hit ? options.smoothBox ?? hit.box : null;
-  const cx = box ? (box.x + box.width / 2) * width : width / 2;
-  const cy = box ? (box.y + box.height / 2) * height : height / 2;
-  const rx = box ? Math.max(10, box.width * width * 0.62) : width * 0.3;
-  const ry = box ? Math.max(10, box.height * height * 0.66) : height * 0.4;
-  const color = options.stable ? '#22C55E' : '#06B6D4';
-
-  // Máscara: oscurece todo fuera de la elipse que envuelve el rostro
-  ctx.save();
-  ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
-  ctx.fillRect(0, 0, width, height);
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Contorno de la máscara (guía fija mientras no hay rostro)
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1.5, width / 300);
-  if (!box) ctx.setLineDash([width / 42, width / 30]);
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
   if (!hit) return;
 
-  // Puntos de profundidad: contorno, ojos, nariz y boca
-  const step = hit.landmarks.length > GEOM_POINTS ? hit.landmarks.length / GEOM_POINTS : 1;
+  const landmarks = hit.landmarks;
+  const color = options.stable ? '#22C55E' : '#06B6D4';
+
+  // Contorno facial real (FACE_OVAL) con brillo suave
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(2, width / 220);
+  ctx.shadowColor = color;
+  ctx.shadowBlur = Math.max(6, width / 60);
+  strokePath(ctx, landmarks, FACE_OVAL, width, height);
+  ctx.restore();
+
+  // Estructura interna: ojos, nariz y boca
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = Math.max(1.3, width / 340);
+  strokePath(ctx, landmarks, LEFT_EYE, width, height);
+  strokePath(ctx, landmarks, RIGHT_EYE, width, height);
+  strokePath(ctx, landmarks, NOSE_LINE, width, height);
+  strokePath(ctx, landmarks, MOUTH_OUTER, width, height);
+  strokePath(ctx, landmarks, MOUTH_INNER, width, height);
+  ctx.restore();
+
+  // Pupilas (iris cuando el modelo trae 478 puntos)
+  const pupilRadius = Math.max(2.2, width / 150);
+  for (const index of IRIS) {
+    const point = landmarks[index];
+    if (!point) continue;
+    const x = point.x * width;
+    const y = point.y * height;
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(x, y, pupilRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, pupilRadius * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Campo de puntos de profundidad
+  const step = landmarks.length > GEOM_POINTS ? landmarks.length / GEOM_POINTS : 1;
+  const radius = Math.max(1.6, width / 320);
+  ctx.save();
   ctx.fillStyle = color;
+  ctx.globalAlpha = 0.85;
   for (let i = 0; i < GEOM_POINTS; i += 1) {
-    const point = hit.landmarks[Math.floor(i * step)];
+    const point = landmarks[Math.floor(i * step)];
     if (!point) continue;
     ctx.beginPath();
-    ctx.arc(point.x * width, point.y * height, 1.4, 0, Math.PI * 2);
+    ctx.arc(point.x * width, point.y * height, radius, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
 }

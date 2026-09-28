@@ -304,6 +304,37 @@ html.dark.theme-matrix {
   .recharts-tooltip-wrapper {
     display: none !important;
   }
+
+  /* Informe completo ("Imprimir todo"): secciones ordenadas, una por hoja */
+  #report-print .print-report-title {
+    display: block !important;
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a !important;
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #2563eb;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  #report-print .print-report-section {
+    break-before: page;
+    page-break-before: always;
+  }
+  #report-print .print-report-section:first-of-type {
+    break-before: auto;
+    page-break-before: auto;
+  }
+  #report-print .print-report-section table {
+    width: 100% !important;
+  }
+  #report-print .print-report-section thead {
+    display: table-header-group;
+  }
+  #report-print .print-report-section tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 /* Tabs desplazables con el dedo en móviles */
@@ -312,6 +343,40 @@ html.dark.theme-matrix {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Títulos de sección del informe: solo se ven al imprimir */
+.print-report-title {
+  display: none;
+}
+
+/* Línea de escaneo facial: raya que baja sobre el vídeo mientras escanea */
+.scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #22d3ee 15%, #22d3ee 85%, transparent);
+  box-shadow: 0 0 10px 2px rgba(34, 211, 238, 0.65);
+  animation: scan-sweep 1.6s linear infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+@keyframes scan-sweep {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
 }
 
 /* Gráfico ampliado en pantalla: el gráfico llena el área disponible */
