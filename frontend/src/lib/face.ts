@@ -242,21 +242,19 @@ function strokePath(
   ctx: CanvasRenderingContext2D,
   landmarks: FacePoint[],
   indices: number[],
-  width: number,
-  height: number,
+  px: (value: number) => number,
+  py: (value: number) => number,
 ): boolean {
   let drew = false;
   ctx.beginPath();
   for (const index of indices) {
     const point = landmarks[index];
     if (!point) continue;
-    const x = point.x * width;
-    const y = point.y * height;
     if (!drew) {
-      ctx.moveTo(x, y);
+      ctx.moveTo(px(point.x), py(point.y));
       drew = true;
     } else {
-      ctx.lineTo(x, y);
+      ctx.lineTo(px(point.x), py(point.y));
     }
   }
   if (drew) ctx.stroke();
@@ -267,21 +265,19 @@ function fillPath(
   ctx: CanvasRenderingContext2D,
   landmarks: FacePoint[],
   indices: number[],
-  width: number,
-  height: number,
+  px: (value: number) => number,
+  py: (value: number) => number,
 ): boolean {
   let drew = false;
   ctx.beginPath();
   for (const index of indices) {
     const point = landmarks[index];
     if (!point) continue;
-    const x = point.x * width;
-    const y = point.y * height;
     if (!drew) {
-      ctx.moveTo(x, y);
+      ctx.moveTo(px(point.x), py(point.y));
       drew = true;
     } else {
-      ctx.lineTo(x, y);
+      ctx.lineTo(px(point.x), py(point.y));
     }
   }
   if (drew) {
@@ -335,20 +331,45 @@ function depthColor(t: number): string {
 export function drawFaceOverlay(
   canvas: HTMLCanvasElement,
   hit: FaceHit | null,
-  options: { stable?: boolean; smoothBox?: FaceHit['box'] } = {},
+  options: {
+    stable?: boolean;
+    smoothBox?: FaceHit['box'];
+    video?: { width: number; height: number };
+    cssWidth?: number;
+    cssHeight?: number;
+  } = {},
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const width = canvas.width;
-  const height = canvas.height;
-  ctx.clearRect(0, 0, width, height);
+  const cssW = options.cssWidth && options.cssWidth > 0 ? options.cssWidth : canvas.width;
+  const cssH = options.cssHeight && options.cssHeight > 0 ? options.cssHeight : canvas.height;
+  const dpr = cssW > 0 ? canvas.width / cssW : 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (!hit) return;
 
   const landmarks = hit.landmarks;
-  const stable = !!options.stable;
-  const glow = stable ? Math.max(6, width / 70) : 0;
 
-  // Campo de puntos del mesh coloreado por profundidad (478 puntos)
+  /* Misma transformación que object-cover del <video>: escala uniforme
+     (la mayor de cubrir el contenedor) con los offsets centrados, para que
+     los puntos caigan exactamente sobre el rostro, sin estirarse. */
+  const vw = options.video?.width || cssW;
+  const vh = options.video?.height || cssH;
+  const cover = Math.max(cssW / vw, cssH / vh);
+  const offsetX = (cssW - vw * cover) / 2;
+  const offsetY = (cssH - vh * cover) / 2;
+  const px = (value: number) => offsetX + value * vw * cover;
+  const py = (value: number) => offsetY + value * vh * cover;
+
+  /* Escala facial: todo el grosor se deriva del tamaño visible del rostro
+     (smoothBox) para que la malla "respire" con la distancia a la cámara. */
+  const box = options.smoothBox ?? hit.box;
+  const faceW = Math.max(32, box.width * vw * cover);
+  const stable = !!options.stable;
+  const glow = stable ? Math.max(4, faceW * 0.05) : 0;
+
+  // Campo de puntos del mesh coloreado por profundidad (478 puntos, diminutos)
   let zMin = Infinity;
   let zMax = -Infinity;
   for (const point of landmarks) {
@@ -356,14 +377,14 @@ export function drawFaceOverlay(
     if (point.z > zMax) zMax = point.z;
   }
   const zSpan = zMax - zMin || 1;
-  const baseRadius = Math.max(1.7, width / 330);
+  const baseRadius = Math.max(1, Math.min(2.4, faceW * 0.0075));
   ctx.save();
   ctx.globalAlpha = 0.92;
   for (const point of landmarks) {
     const t = (zMax - point.z) / zSpan;
     ctx.fillStyle = depthColor(t);
     ctx.beginPath();
-    ctx.arc(point.x * width, point.y * height, baseRadius * (0.75 + 0.7 * t), 0, Math.PI * 2);
+    ctx.arc(px(point.x), py(point.y), baseRadius * (0.75 + 0.7 * t), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -375,12 +396,12 @@ export function drawFaceOverlay(
     ctx.shadowColor = '#22C55E';
     ctx.shadowBlur = glow;
   }
-  const noseRadius = Math.max(3, width / 95);
+  const noseRadius = Math.max(1.8, Math.min(4.2, faceW * 0.014));
   for (const index of [...NOSE_LINE, ...NOSE_BASE]) {
     const point = landmarks[index];
     if (!point) continue;
     ctx.beginPath();
-    ctx.arc(point.x * width, point.y * height, noseRadius, 0, Math.PI * 2);
+    ctx.arc(px(point.x), py(point.y), noseRadius, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -388,37 +409,37 @@ export function drawFaceOverlay(
   // Boca: relleno naranja translúcido + contorno
   ctx.save();
   ctx.fillStyle = 'rgba(255, 152, 0, 0.38)';
-  fillPath(ctx, landmarks, MOUTH_OUTER, width, height);
+  fillPath(ctx, landmarks, MOUTH_OUTER, px, py);
   ctx.strokeStyle = '#FF9800';
-  ctx.lineWidth = Math.max(1.8, width / 240);
+  ctx.lineWidth = Math.max(1.4, Math.min(3, faceW * 0.009));
   ctx.lineJoin = 'round';
   if (stable) {
     ctx.shadowColor = '#FF9800';
     ctx.shadowBlur = glow;
   }
-  strokePath(ctx, landmarks, MOUTH_OUTER, width, height);
+  strokePath(ctx, landmarks, MOUTH_OUTER, px, py);
   ctx.strokeStyle = '#FFB74D';
-  ctx.lineWidth = Math.max(1.2, width / 360);
-  strokePath(ctx, landmarks, MOUTH_INNER, width, height);
+  ctx.lineWidth = Math.max(1, Math.min(2, faceW * 0.006));
+  strokePath(ctx, landmarks, MOUTH_INNER, px, py);
   ctx.restore();
 
   // Ojos: relleno rojo translúcido, contorno rojo y anillo de iris
   ctx.save();
   ctx.fillStyle = 'rgba(255, 61, 58, 0.42)';
-  fillPath(ctx, landmarks, LEFT_EYE, width, height);
-  fillPath(ctx, landmarks, RIGHT_EYE, width, height);
+  fillPath(ctx, landmarks, LEFT_EYE, px, py);
+  fillPath(ctx, landmarks, RIGHT_EYE, px, py);
   ctx.strokeStyle = '#FF3B30';
-  ctx.lineWidth = Math.max(1.8, width / 230);
+  ctx.lineWidth = Math.max(1.4, Math.min(3, faceW * 0.009));
   ctx.lineJoin = 'round';
   if (stable) {
     ctx.shadowColor = '#FF3B30';
     ctx.shadowBlur = glow;
   }
-  strokePath(ctx, landmarks, LEFT_EYE, width, height);
-  strokePath(ctx, landmarks, RIGHT_EYE, width, height);
+  strokePath(ctx, landmarks, LEFT_EYE, px, py);
+  strokePath(ctx, landmarks, RIGHT_EYE, px, py);
   ctx.shadowBlur = 0;
-  const irisRadius = Math.max(1.6, width / 300);
-  const irisCenterRadius = Math.max(2, width / 200);
+  const irisRadius = Math.max(1.2, Math.min(2.6, faceW * 0.0065));
+  const irisCenterRadius = Math.max(1.5, Math.min(3.2, faceW * 0.008));
   for (const set of [LEFT_IRIS, RIGHT_IRIS]) {
     ctx.fillStyle = '#FF6B6B';
     let cx = 0;
@@ -428,7 +449,7 @@ export function drawFaceOverlay(
       const point = landmarks[index];
       if (!point) continue;
       ctx.beginPath();
-      ctx.arc(point.x * width, point.y * height, irisRadius, 0, Math.PI * 2);
+      ctx.arc(px(point.x), py(point.y), irisRadius, 0, Math.PI * 2);
       ctx.fill();
       cx += point.x;
       cy += point.y;
@@ -437,7 +458,7 @@ export function drawFaceOverlay(
     if (count) {
       ctx.fillStyle = '#F43F5E';
       ctx.beginPath();
-      ctx.arc((cx / count) * width, (cy / count) * height, irisCenterRadius, 0, Math.PI * 2);
+      ctx.arc(px(cx / count), py(cy / count), irisCenterRadius, 0, Math.PI * 2);
       ctx.fill();
     }
   }

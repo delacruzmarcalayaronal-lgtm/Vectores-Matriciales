@@ -1,11 +1,40 @@
-export type ThemeMode = 'light' | 'dark' | 'system' | 'midnight' | 'ocean' | 'matrix';
+export type ThemeMode =
+  | 'light'
+  | 'dark'
+  | 'system'
+  | 'midnight'
+  | 'ocean'
+  | 'matrix'
+  | 'noir'
+  | 'navy'
+  | 'graphite'
+  | 'cosmos';
 
 const THEME_KEY = 'mf_theme';
 export const DEFAULT_PRIMARY = '#2563EB';
 
-const PRESET_DARK_CLASSES = ['theme-midnight', 'theme-ocean', 'theme-matrix'];
+const PRESET_DARK_CLASSES = [
+  'theme-midnight',
+  'theme-ocean',
+  'theme-matrix',
+  'theme-noir',
+  'theme-navy',
+  'theme-graphite',
+  'theme-cosmos',
+];
 
-export const THEME_OPTIONS: ThemeMode[] = ['light', 'dark', 'system', 'midnight', 'ocean', 'matrix'];
+export const THEME_OPTIONS: ThemeMode[] = [
+  'light',
+  'dark',
+  'system',
+  'midnight',
+  'ocean',
+  'matrix',
+  'noir',
+  'navy',
+  'graphite',
+  'cosmos',
+];
 
 /** El color de acento lo define el tema (ya no hay selector independiente). */
 export const THEME_ACCENTS: Record<ThemeMode, string> = {
@@ -15,6 +44,10 @@ export const THEME_ACCENTS: Record<ThemeMode, string> = {
   midnight: '#4338CA',
   ocean: '#0E7490',
   matrix: '#15803D',
+  noir: '#94A3B8',
+  navy: '#60A5FA',
+  graphite: '#A1A1AA',
+  cosmos: '#A78BFA',
 };
 
 export function accentForTheme(mode: ThemeMode): string {

@@ -277,11 +277,22 @@ export function Identity() {
         }
         const overlay = overlayRef.current;
         if (overlay) {
-          if (video.videoWidth && overlay.width !== video.videoWidth) {
-            overlay.width = video.videoWidth;
-            overlay.height = video.videoHeight;
+          const rect = overlay.getBoundingClientRect();
+          const cssW = Math.max(1, Math.round(rect.width));
+          const cssH = Math.max(1, Math.round(rect.height));
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          const backingW = Math.max(1, Math.round(cssW * dpr));
+          const backingH = Math.max(1, Math.round(cssH * dpr));
+          if (overlay.width !== backingW || overlay.height !== backingH) {
+            overlay.width = backingW;
+            overlay.height = backingH;
           }
-          drawFaceOverlay(overlay, hit, { smoothBox });
+          drawFaceOverlay(overlay, hit, {
+            smoothBox,
+            video: { width: video.videoWidth, height: video.videoHeight },
+            cssWidth: cssW,
+            cssHeight: cssH,
+          });
         }
         if (!hit) {
           setScanMsg('Buscando el rostro… coloca tu rostro frente a la cámara');

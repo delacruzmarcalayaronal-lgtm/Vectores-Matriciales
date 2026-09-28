@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, CheckCircle2, Loader2, RefreshCw, ScanFace, ShieldAlert, Target } from 'lucide-react';
-import { buildDescriptor, detectFace, drawFaceOverlay, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
+import { buildDescriptor, DEFAULT_THRESHOLD, detectFace, drawFaceOverlay, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
 
 export interface FaceScanResult {
   vector: number[] | null;
@@ -128,11 +128,23 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
         }
         const overlay = overlayRef.current;
         if (overlay) {
-          if (current.videoWidth && overlay.width !== current.videoWidth) {
-            overlay.width = current.videoWidth;
-            overlay.height = current.videoHeight;
+          const rect = overlay.getBoundingClientRect();
+          const cssW = Math.max(1, Math.round(rect.width));
+          const cssH = Math.max(1, Math.round(rect.height));
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          const backingW = Math.max(1, Math.round(cssW * dpr));
+          const backingH = Math.max(1, Math.round(cssH * dpr));
+          if (overlay.width !== backingW || overlay.height !== backingH) {
+            overlay.width = backingW;
+            overlay.height = backingH;
           }
-          drawFaceOverlay(overlay, hit, { stable: stableRef.current >= STABLE_REQUIRED, smoothBox });
+          drawFaceOverlay(overlay, hit, {
+            stable: stableRef.current >= STABLE_REQUIRED,
+            smoothBox,
+            video: { width: current.videoWidth, height: current.videoHeight },
+            cssWidth: cssW,
+            cssHeight: cssH,
+          });
         }
         if (!hit) {
           stableRef.current = Math.max(0, stableRef.current - 1);
@@ -323,6 +335,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
               Giro: {hud.giro >= 0 ? '+' : ''}
               {hud.giro.toFixed(2)} (gira a ±{FRONTAL_GIRO_LIMIT.toFixed(2)})
             </p>
+            <p className="text-white/85">Umbral: {DEFAULT_THRESHOLD}%</p>
           </div>
         )}
         {engineScan && (

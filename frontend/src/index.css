@@ -157,6 +157,66 @@ html.dark.theme-matrix {
   --sidebar-gradient: linear-gradient(180deg, #041006 0%, #10301A 100%);
 }
 
+html.dark.theme-noir {
+  --color-bg: #050506;
+  --color-text: #ECEDEF;
+  --color-secondary: #9BA1AC;
+  --color-border: #24262B;
+  --color-sidebar: #070708;
+  --color-accent: #94A3B8;
+  --surface-1: #0D0E10;
+  --surface-2: #0B0C0E;
+  --surface-3: #090A0B;
+  --surface-4: #070809;
+  --surface-hover: #15171B;
+  --sidebar-gradient: linear-gradient(180deg, #070708 0%, #101216 100%);
+}
+
+html.dark.theme-navy {
+  --color-bg: #060B16;
+  --color-text: #E3ECFA;
+  --color-secondary: #93A5C2;
+  --color-border: #1B2A47;
+  --color-sidebar: #050A14;
+  --color-accent: #60A5FA;
+  --surface-1: #0C1526;
+  --surface-2: #0A1220;
+  --surface-3: #080F1B;
+  --surface-4: #060C16;
+  --surface-hover: #132240;
+  --sidebar-gradient: linear-gradient(180deg, #050A14 0%, #0D1A33 100%);
+}
+
+html.dark.theme-graphite {
+  --color-bg: #0C0D0F;
+  --color-text: #E8EAED;
+  --color-secondary: #9CA2AB;
+  --color-border: #26292E;
+  --color-sidebar: #0A0B0D;
+  --color-accent: #A1A1AA;
+  --surface-1: #131518;
+  --surface-2: #111214;
+  --surface-3: #0E0F11;
+  --surface-4: #0B0C0E;
+  --surface-hover: #1A1D21;
+  --sidebar-gradient: linear-gradient(180deg, #0A0B0D 0%, #14171B 100%);
+}
+
+html.dark.theme-cosmos {
+  --color-bg: #08040F;
+  --color-text: #EDE9FE;
+  --color-secondary: #A79BC4;
+  --color-border: #2C2050;
+  --color-sidebar: #070310;
+  --color-accent: #A78BFA;
+  --surface-1: #140B22;
+  --surface-2: #11091D;
+  --surface-3: #0D0717;
+  --surface-4: #0A0512;
+  --surface-hover: #1E1236;
+  --sidebar-gradient: linear-gradient(180deg, #070310 0%, #170D2E 100%);
+}
+
 @media print {
   @page {
     margin: 0;

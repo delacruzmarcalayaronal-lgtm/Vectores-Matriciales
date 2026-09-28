@@ -56,6 +56,10 @@ const THEME_CARDS: Record<ThemeMode, { label: string; bg: string; surface: strin
   midnight: { label: 'Medianoche', bg: '#03060E', surface: '#1E293B', text: '#E2E8F0', border: '#1E293B' },
   ocean: { label: 'Océano', bg: '#041019', surface: '#14425C', text: '#E0F2FE', border: '#14425C' },
   matrix: { label: 'Matrix', bg: '#030803', surface: '#1B3A21', text: '#DCFCE7', border: '#1B3A21' },
+  noir: { label: 'Noir', bg: '#050506', surface: '#15171B', text: '#ECEDEF', border: '#24262B' },
+  navy: { label: 'Azul Marino', bg: '#060B16', surface: '#132240', text: '#E3ECFA', border: '#1B2A47' },
+  graphite: { label: 'Carbón', bg: '#0C0D0F', surface: '#1A1D21', text: '#E8EAED', border: '#26292E' },
+  cosmos: { label: 'Cosmos', bg: '#08040F', surface: '#1E1236', text: '#EDE9FE', border: '#2C2050' },
 };
 
 export function Settings() {
