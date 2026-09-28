@@ -58,12 +58,14 @@ export function Header({
           )}
           <NotificationBell />
           <OnlineStatus className="hidden sm:flex" />
-          {!hasSidebar && (
-            <ProfileAvatar
-              size="sm"
-              ringClassName="ring-2 ring-primary/20"
-              dotBorderClassName="border-white"
-            />
+          {user && (
+            <span className={hasSidebar ? 'lg:hidden' : ''}>
+              <ProfileAvatar
+                size="sm"
+                ringClassName="ring-2 ring-primary/20"
+                dotBorderClassName="border-white"
+              />
+            </span>
           )}
         </div>
       </div>

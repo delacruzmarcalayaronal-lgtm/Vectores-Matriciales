@@ -4,8 +4,6 @@ import { Calculator, IdCard, Loader2, ShieldCheck, AlertCircle, UserPlus, LogIn,
 import { FaceScanner, type FaceScanResult } from '../components/auth/FaceScanner';
 import { SmokeField } from '../components/auth/SmokeField';
 import { useAuth } from '../contexts/useAuth';
-import { DEMO_USERS } from '../services/mockApi';
-import { ROLE_LABELS, ROLE_ICONS } from '../lib/permissions';
 import { readBgMotion, BG_MOTION_EVENT } from '../lib/bgMotion';
 
 type AuthMode = 'login' | 'register';
@@ -323,29 +321,7 @@ export function Login() {
                 )}
               </button>
 
-              {mode === 'login' ? (
-                <div className="p-3 rounded-lg bg-gray-50 border border-border space-y-2">
-                  <p className="text-xs font-medium text-secondary flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5" />
-                    Cuentas de prueba (clic para rellenar)
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {DEMO_USERS.map(account => (
-                      <button
-                        key={account.dni}
-                        type="button"
-                        onClick={() => handleDniChange(account.dni)}
-                        className="text-left px-2 py-1.5 rounded-md border border-border bg-white hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                      >
-                        <span className="block text-[11px] text-secondary truncate">
-                          {ROLE_ICONS[account.role]} {ROLE_LABELS[account.role]}
-                        </span>
-                        <span className="block text-xs font-mono font-medium text-text">{account.dni}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
+              {mode !== 'login' && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 border border-border">
                   <Lock className="w-4 h-4 text-secondary flex-shrink-0" />
                   <p className="text-xs text-secondary">
