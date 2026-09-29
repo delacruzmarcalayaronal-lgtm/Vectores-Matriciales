@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, CheckCircle2, Loader2, RefreshCw, ScanFace, ShieldAlert, Target } from 'lucide-react';
-import { buildDescriptor, DEFAULT_THRESHOLD, detectFace, drawFaceOverlay, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
+import { buildDescriptor, detectFace, drawFaceOverlay, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
 
 export interface FaceScanResult {
   vector: number[] | null;
@@ -335,7 +335,6 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
               Giro: {hud.giro >= 0 ? '+' : ''}
               {hud.giro.toFixed(2)} (gira a ±{FRONTAL_GIRO_LIMIT.toFixed(2)})
             </p>
-            <p className="text-white/85">Umbral: {DEFAULT_THRESHOLD}%</p>
           </div>
         )}
         {engineScan && (

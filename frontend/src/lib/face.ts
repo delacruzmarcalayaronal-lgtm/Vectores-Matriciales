@@ -427,20 +427,21 @@ export function drawFaceOverlay(
   strokePath(ctx, landmarks, MOUTH_INNER, px, py);
   ctx.restore();
 
-  // Ojos: relleno rojo translúcido, contorno rojo y anillo de iris
+  // Ojos: puntos rojos en el contorno + anillo de iris
   ctx.save();
-  ctx.fillStyle = 'rgba(255, 61, 58, 0.42)';
-  fillPath(ctx, landmarks, LEFT_EYE, px, py);
-  fillPath(ctx, landmarks, RIGHT_EYE, px, py);
-  ctx.strokeStyle = '#FF3B30';
-  ctx.lineWidth = Math.max(1.4, Math.min(3, faceW * 0.009));
-  ctx.lineJoin = 'round';
+  ctx.fillStyle = '#FF3B30';
   if (stable) {
     ctx.shadowColor = '#FF3B30';
     ctx.shadowBlur = glow;
   }
-  strokePath(ctx, landmarks, LEFT_EYE, px, py);
-  strokePath(ctx, landmarks, RIGHT_EYE, px, py);
+  const eyeDot = Math.max(1, Math.min(2.2, faceW * 0.0065));
+  for (const index of [...LEFT_EYE, ...RIGHT_EYE]) {
+    const point = landmarks[index];
+    if (!point) continue;
+    ctx.beginPath();
+    ctx.arc(px(point.x), py(point.y), eyeDot, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.shadowBlur = 0;
   const irisRadius = Math.max(0.9, Math.min(1.8, faceW * 0.005));
   const irisCenterRadius = Math.max(1, Math.min(2.2, faceW * 0.006));
@@ -468,19 +469,20 @@ export function drawFaceOverlay(
   }
   ctx.restore();
 
-  // Cejas: relleno violeta translúcido + contorno
+  // Cejas: puntos violeta sobre el recorrido de la ceja
   ctx.save();
-  ctx.fillStyle = 'rgba(168, 85, 247, 0.34)';
-  fillPath(ctx, landmarks, LEFT_BROW, px, py);
-  fillPath(ctx, landmarks, RIGHT_BROW, px, py);
-  ctx.strokeStyle = '#A855F7';
-  ctx.lineWidth = Math.max(1.2, Math.min(2.4, faceW * 0.007));
-  ctx.lineJoin = 'round';
+  ctx.fillStyle = '#A855F7';
   if (stable) {
     ctx.shadowColor = '#A855F7';
     ctx.shadowBlur = glow;
   }
-  strokePath(ctx, landmarks, LEFT_BROW, px, py);
-  strokePath(ctx, landmarks, RIGHT_BROW, px, py);
+  const browDot = Math.max(1, Math.min(2.2, faceW * 0.0065));
+  for (const index of [...LEFT_BROW, ...RIGHT_BROW]) {
+    const point = landmarks[index];
+    if (!point) continue;
+    ctx.beginPath();
+    ctx.arc(px(point.x), py(point.y), browDot, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
