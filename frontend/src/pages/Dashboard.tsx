@@ -23,6 +23,7 @@ import { useDashboardStats, useSalesByBranch, useSalesByProduct, useTargetCompli
 import { useAuth } from '../contexts/useAuth';
 import { MODULES, MODULE_COLOR_CLASSES } from '../lib/modules';
 import { ROLE_LABELS, ROLE_ICONS, type ModuleKey } from '../lib/permissions';
+import { readGeneral } from '../lib/systemPrefs';
 import { innerPercentLabel, darkTooltipStyle, legendFormatter, metaComplianceTooltip } from '../lib/chartLabels';
 import { ChartZoom } from '../components/charts/ChartZoom';
 import {
@@ -139,7 +140,7 @@ export function Dashboard() {
 
   const hasCommercialKpis = showSales || showInventory || showTargets || showProducts;
   const [sessionTime] = useState(() => new Date());
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+  const timezone = readGeneral().timezone;
   const chipClass = 'inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-border text-secondary';
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -236,7 +237,7 @@ export function Dashboard() {
             </div>
             <dl className="space-y-2 text-sm">
               {sessionRow('DNI', user?.dni || '—')}
-              {sessionRow('Último acceso', sessionTime.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' }))}
+              {sessionRow('Último acceso', sessionTime.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit', timeZone: timezone }))}
               {sessionRow('Zona horaria', timezone)}
             </dl>
             <Link

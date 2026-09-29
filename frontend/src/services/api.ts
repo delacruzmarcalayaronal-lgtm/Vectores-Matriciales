@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { readApiPrefs, PREFS_EVENT } from '../lib/systemPrefs';
 import type {
   AuthResponse,
   ApiError,
@@ -29,6 +30,14 @@ export const api = axios.create({
   },
   timeout: 30000,
 });
+
+export const applyApiPrefs = () => {
+  api.defaults.timeout = readApiPrefs().timeout * 1000;
+};
+
+applyApiPrefs();
+window.addEventListener(PREFS_EVENT, applyApiPrefs);
+window.addEventListener('storage', applyApiPrefs);
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -76,10 +85,23 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+const requestStamps: number[] = [];
+
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     if (accessToken && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    const limit = readApiPrefs().limit;
+    if (limit > 0) {
+      const now = Date.now();
+      while (requestStamps.length && now - requestStamps[0] >= 60000) requestStamps.shift();
+      if (requestStamps.length >= limit) {
+        const waitMs = 60000 - (now - requestStamps[0]);
+        if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+        requestStamps.shift();
+      }
+      requestStamps.push(Date.now());
     }
     return config;
   },
@@ -122,6 +144,19 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
+      }
+    }
+
+    const retryable = error.config as (InternalAxiosRequestConfig & { _httpRetry?: number }) | undefined;
+    const status = error.response?.status;
+    const transient = !error.response || (status !== undefined && status >= 500 && status <= 599);
+    const method = (retryable?.method || 'get').toLowerCase();
+    if (retryable && transient && (method === 'get' || method === 'head')) {
+      const attempt = retryable._httpRetry ?? 0;
+      if (attempt < readApiPrefs().retries) {
+        retryable._httpRetry = attempt + 1;
+        await new Promise(resolve => setTimeout(resolve, 400 * 2 ** attempt));
+        return api(retryable);
       }
     }
 

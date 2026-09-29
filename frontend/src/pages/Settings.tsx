@@ -28,10 +28,12 @@ import {
   operationsApi,
   branchesApi,
   categoriesApi,
-  inventoryApi
+  inventoryApi,
+  applyApiPrefs
 } from '../services/api';
 import { downloadFile, toCSV, parseCSV, jsonOf } from '../lib/exportUtils';
 import { readBgMotion, writeBgMotion, type BgMotionConfig, type BgDensity } from '../lib/bgMotion';
+import { readGeneral, timezoneOptions, savePrefs, type GeneralPrefs } from '../lib/systemPrefs';
 
 const COMPANY_ID = '1';
 
@@ -41,10 +43,6 @@ const readPrefs = (key: string): Record<string, unknown> => {
   } catch {
     return {};
   }
-};
-
-const writePrefs = (key: string, value: unknown) => {
-  localStorage.setItem(key, JSON.stringify(value));
 };
 
 const dateStamp = () => new Date().toISOString().slice(0, 10);
@@ -89,6 +87,11 @@ export function Settings() {
     phone: '',
   });
 
+  const [generalPrefs, setGeneralPrefs] = useState<GeneralPrefs>(() => readGeneral());
+
+  const setGP = <K extends keyof GeneralPrefs>(key: K, value: GeneralPrefs[K]) =>
+    setGeneralPrefs(prev => ({ ...prev, [key]: value }));
+
   const [notif, setNotif] = useState<Record<string, boolean>>(() => ({
     bell_alerts: true,
     stock_alerts: true,
@@ -104,7 +107,6 @@ export function Settings() {
     maxLoginAttempts: 5,
     accessTokenMinutes: 60,
     refreshDays: 30,
-    twoFactor: true,
     idleLock: false,
     ...readPrefs('mf_security'),
   }));
@@ -161,20 +163,21 @@ export function Settings() {
     setSaving(true);
     try {
       if (effectiveTab === 'general') {
+        savePrefs('mf_general', generalPrefs);
         await companiesApi.update(COMPANY_ID, general);
-        show('Datos de la empresa guardados en la base de datos.');
+        show('Configuración general guardada.');
       } else if (effectiveTab === 'notifications') {
-        writePrefs('mf_notifications', notif);
+        savePrefs('mf_notifications', notif);
         show('Preferencias de notificaciones guardadas.');
       } else if (effectiveTab === 'security') {
-        writePrefs('mf_security', security);
+        savePrefs('mf_security', security);
         show('Configuración de seguridad guardada.');
       } else if (effectiveTab === 'api') {
-        writePrefs('mf_api', apiPrefs);
-        show('Configuración de API guardada.');
+        savePrefs('mf_api', apiPrefs);
+        applyApiPrefs();
+        show('Configuración de API aplicada.');
       } else {
-        writePrefs('mf_general_misc', { savedAt: new Date().toISOString() });
-        show('Cambios guardados.');
+        show('Preferencias de apariencia guardadas.');
       }
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -456,26 +459,24 @@ export function Settings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Select
                 label="Zona Horaria"
-                defaultValue="America/Lima"
-                options={[
-                  { value: 'America/Lima', label: 'America/Lima (UTC-5)' },
-                  { value: 'America/Bogota', label: 'America/Bogota (UTC-5)' },
-                  { value: 'America/Mexico_City', label: 'America/Mexico_City (UTC-6)' },
-                  { value: 'America/Argentina/Buenos_Aires', label: 'America/Argentina/Buenos_Aires (UTC-3)' },
-                ]}
-              />
-              <Select
-                label="Idioma"
-                defaultValue="es"
-                options={[
-                  { value: 'es', label: 'Español' },
-                  { value: 'en', label: 'English' },
-                ]}
+                value={generalPrefs.timezone}
+                onChange={e => setGP('timezone', e.target.value)}
+                options={timezoneOptions(generalPrefs.timezone)}
+                helperText="Define las horas mostradas en el dashboard"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="maintenance" className="w-4 h-4 rounded border-border text-primary focus:ring-primary" />
-              <label htmlFor="maintenance" className="text-sm font-medium text-text">Modo mantenimiento</label>
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id="maintenance"
+                checked={generalPrefs.maintenance}
+                onChange={e => setGP('maintenance', e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <div>
+                <label htmlFor="maintenance" className="text-sm font-medium text-text">Modo mantenimiento</label>
+                <p className="text-xs text-secondary">Muestra un aviso en toda la aplicación mientras está activo</p>
+              </div>
             </div>
             <div className="flex justify-end pt-4 border-t border-border">
               <Button onClick={handleSave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>
@@ -644,29 +645,38 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Tiempo de Sesión (minutos)" type="number" value={String(security.sessionMinutes ?? 480)} onChange={e => setSecurity(prev => ({ ...prev, sessionMinutes: Number(e.target.value) }))} />
-              <Input label="Intentos de Login Máximos" type="number" value={String(security.maxLoginAttempts ?? 5)} onChange={e => setSecurity(prev => ({ ...prev, maxLoginAttempts: Number(e.target.value) }))} />
+              <Input
+                label="Tiempo de Sesión (minutos)"
+                type="number"
+                value={String(security.sessionMinutes ?? 480)}
+                onChange={e => setSecurity(prev => ({ ...prev, sessionMinutes: Number(e.target.value) }))}
+                helperText="Minutos sin actividad antes de cerrar la sesión (con bloqueo activo)"
+              />
+              <Input
+                label="Intentos de Login Máximos"
+                type="number"
+                value={String(security.maxLoginAttempts ?? 5)}
+                onChange={e => setSecurity(prev => ({ ...prev, maxLoginAttempts: Number(e.target.value) }))}
+                helperText="Al superarlo el acceso queda bloqueado 5 minutos"
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Duración Token Acceso (min)" type="number" value={String(security.accessTokenMinutes ?? 60)} onChange={e => setSecurity(prev => ({ ...prev, accessTokenMinutes: Number(e.target.value) }))} />
-              <Input label="Duración Token Refresh (días)" type="number" value={String(security.refreshDays ?? 30)} onChange={e => setSecurity(prev => ({ ...prev, refreshDays: Number(e.target.value) }))} />
+              <Input
+                label="Duración Token Acceso (min)"
+                type="number"
+                value={String(security.accessTokenMinutes ?? 60)}
+                disabled
+                helperText="Gestionado por el servidor (variables de entorno del backend)"
+              />
+              <Input
+                label="Duración Token Refresh (días)"
+                type="number"
+                value={String(security.refreshDays ?? 30)}
+                disabled
+                helperText="Gestionado por el servidor (variables de entorno del backend)"
+              />
             </div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-border">
-                <div>
-                  <p className="font-medium text-text">Autenticación de Dos Factores (2FA)</p>
-                  <p className="text-sm text-secondary">Requerir 2FA para todos los administradores</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(security.twoFactor)}
-                    onChange={e => setSecurity(prev => ({ ...prev, twoFactor: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </div>
               <div className="flex items-center justify-between py-3 border-b border-border">
                 <div>
                   <p className="font-medium text-text">Bloqueo por Inactividad</p>
@@ -788,9 +798,27 @@ export function Settings() {
             <Input label="URL Base API" value={String(import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1')} readOnly />
             <p className="text-xs text-secondary">La URL base la define la variable de entorno VITE_API_URL del despliegue (Vercel) y no puede cambiarse desde la interfaz.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Input label="Límite Requests/min" type="number" value={String(apiPrefs.limit ?? 100)} onChange={e => setApiPrefs(prev => ({ ...prev, limit: Number(e.target.value) }))} />
-              <Input label="Timeout (segundos)" type="number" value={String(apiPrefs.timeout ?? 30)} onChange={e => setApiPrefs(prev => ({ ...prev, timeout: Number(e.target.value) }))} />
-              <Input label="Reintentos" type="number" value={String(apiPrefs.retries ?? 3)} onChange={e => setApiPrefs(prev => ({ ...prev, retries: Number(e.target.value) }))} />
+              <Input
+                label="Límite Requests/min"
+                type="number"
+                value={String(apiPrefs.limit ?? 100)}
+                onChange={e => setApiPrefs(prev => ({ ...prev, limit: Number(e.target.value) }))}
+                helperText="Máximo de peticiones por minuto desde este navegador"
+              />
+              <Input
+                label="Timeout (segundos)"
+                type="number"
+                value={String(apiPrefs.timeout ?? 30)}
+                onChange={e => setApiPrefs(prev => ({ ...prev, timeout: Number(e.target.value) }))}
+                helperText="Espera antes de considerar una petición sin respuesta"
+              />
+              <Input
+                label="Reintentos"
+                type="number"
+                value={String(apiPrefs.retries ?? 3)}
+                onChange={e => setApiPrefs(prev => ({ ...prev, retries: Number(e.target.value) }))}
+                helperText="Reintentos automáticos en GET ante fallos de red o 5xx"
+              />
             </div>
             <div className="flex justify-end pt-4 border-t border-border">
               <Button onClick={handleSave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>Guardar Cambios</Button>

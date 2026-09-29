@@ -14,6 +14,7 @@ import {
 import type { AppNotification, NotificationType } from '../../types';
 import { useAuth } from '../../contexts/useAuth';
 import { useNotifications, useNotificationActions, useNotificationSync } from '../../hooks/useApi';
+import { readNotifPrefs, PREFS_EVENT } from '../../lib/systemPrefs';
 
 const TYPE_ICONS: Record<NotificationType, typeof Bell> = {
   stock: PackageMinus,
@@ -40,6 +41,17 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const [bellOn, setBellOn] = useState(() => readNotifPrefs().bell_alerts !== false);
+
+  useEffect(() => {
+    const onChange = () => setBellOn(readNotifPrefs().bell_alerts !== false);
+    window.addEventListener(PREFS_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener(PREFS_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
 
   const { data: notifications = [] } = useNotifications(companyId);
   const actions = useNotificationActions(companyId);
@@ -66,6 +78,8 @@ export function NotificationBell() {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  if (!bellOn) return null;
 
   const visible = notifications.filter(n => !n.isDismissed);
   const unread = visible.filter(n => !n.isRead).length;

@@ -1,16 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Calculator, IdCard, Loader2, ShieldCheck, AlertCircle, UserPlus, LogIn, Grid3x3, BarChart3, Lock, ScanFace } from 'lucide-react';
 import { FaceScanner, type FaceScanResult } from '../components/auth/FaceScanner';
 import { SmokeField } from '../components/auth/SmokeField';
 import { useAuth } from '../contexts/useAuth';
 import { readBgMotion, BG_MOTION_EVENT } from '../lib/bgMotion';
+import {
+  readSecurity,
+  readLoginAttempts,
+  registerFailedLogin,
+  clearLoginAttempts,
+} from '../lib/systemPrefs';
 
 type AuthMode = 'login' | 'register';
 type LoginMethod = 'dni' | 'face';
 
+const blockedMessage = (until: number) => {
+  const minutes = Math.max(1, Math.ceil((until - Date.now()) / 60000));
+  return `Demasiados intentos fallidos. Espera ${minutes} minuto${minutes === 1 ? '' : 's'} para volver a intentarlo.`;
+};
+
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, loginWithFace, register, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>('login');
@@ -18,7 +30,11 @@ export function Login() {
   const [dni, setDni] = useState('');
   const [name, setName] = useState('');
   const [faceScan, setFaceScan] = useState<FaceScanResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    searchParams.get('motivo') === 'inactividad'
+      ? 'Tu sesión se cerró por inactividad. Vuelve a entrar para continuar.'
+      : null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [bgMotion, setBgMotion] = useState(readBgMotion);
 
@@ -66,6 +82,12 @@ export function Login() {
     event.preventDefault();
     setError(null);
 
+    const attemptsNow = readLoginAttempts();
+    if (attemptsNow.until > Date.now()) {
+      setError(blockedMessage(attemptsNow.until));
+      return;
+    }
+
     if (!dniOk) {
       setError('El DNI debe tener exactamente 8 dígitos');
       return;
@@ -88,9 +110,22 @@ export function Login() {
       } else {
         await loginWithFace(dni || undefined, faceScan?.vector ?? undefined);
       }
+      clearLoginAttempts();
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo completar la operación');
+      const base = err instanceof Error ? err.message : 'No se pudo completar la operación';
+      if (mode === 'login') {
+        const maxAttempts = readSecurity().maxLoginAttempts;
+        const attempts = registerFailedLogin(maxAttempts);
+        if (attempts.until > Date.now()) {
+          setError(blockedMessage(attempts.until));
+        } else {
+          const left = Math.max(0, maxAttempts - attempts.count);
+          setError(`${base} · Intento ${attempts.count} de ${maxAttempts}${left > 0 ? ` (${left} restante${left === 1 ? '' : 's'})` : ''}`);
+        }
+      } else {
+        setError(base);
+      }
     } finally {
       setIsLoading(false);
     }

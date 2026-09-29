@@ -5,6 +5,7 @@ import { authApi, clearTokens, setTokens } from '../services/api';
 import { mockAuth } from '../services/mockApi';
 import { can, type ModuleKey } from '../lib/permissions';
 import { clearConsent, notifyConsentChanged } from '../lib/locationConsent';
+import { readSecurity } from '../lib/systemPrefs';
 import { AuthContext, type ProfilePatch } from './auth-context';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
@@ -72,6 +73,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('pageshow', handlePageShow);
     return () => window.removeEventListener('pageshow', handlePageShow);
   }, []);
+
+  const userId = user?.id;
+
+  useEffect(() => {
+    if (!userId) return;
+    let lastActivity = Date.now();
+    const touch = () => {
+      lastActivity = Date.now();
+    };
+    const events: Array<keyof WindowEventMap> = [
+      'mousemove', 'pointerdown', 'keydown', 'wheel', 'scroll', 'touchstart',
+    ];
+    for (const eventName of events) window.addEventListener(eventName, touch, { passive: true });
+    const timer = window.setInterval(() => {
+      const security = readSecurity();
+      if (!security.idleLock) {
+        lastActivity = Date.now();
+        return;
+      }
+      if (Date.now() - lastActivity >= security.sessionMinutes * 60000) {
+        window.clearInterval(timer);
+        if (!USE_MOCK) void authApi.logout().catch(() => undefined);
+        clearTokens();
+        setUser(null);
+        window.location.href = '/login?motivo=inactividad';
+      }
+    }, 15000);
+    return () => {
+      for (const eventName of events) window.removeEventListener(eventName, touch);
+      window.clearInterval(timer);
+    };
+  }, [userId]);
 
   const login = async (dni: string) => {
     try {

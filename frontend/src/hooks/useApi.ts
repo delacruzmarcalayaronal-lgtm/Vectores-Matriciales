@@ -19,6 +19,8 @@ import type {
 } from '../types';
 import { authApi, companiesApi, branchesApi, productsApi, categoriesApi, salesApi, inventoryApi, targetsApi, vectorsApi, matricesApi, operationsApi, reportsApi, usersApi, auditApi, notificationsApi } from '../services/api';
 import { locationsApi } from '../services/locationApi';
+import { readNotifPrefs } from '../lib/systemPrefs';
+import { APP_VERSION } from '../lib/appInfo';
 import { mockAuth, mockCompaniesApi, mockBranchesApi, mockProductsApi, mockCategoriesApi, mockSalesApi, mockInventoryApi, mockTargetsApi, mockVectorsApi, mockMatricesApi, mockOperationsApi, mockReportsApi, mockUsersApi, mockAuditApi, mockNotificationsApi, mockLocationsApi } from '../services/mockApi';
 import type { LocationInput, LocationRecord, WorkerLastLocation, WorkerItem } from '../services/locationApi';
 
@@ -489,10 +491,6 @@ export function useNotificationActions(companyId: string) {
   };
 }
 
-const readNotifPrefs = (): Record<string, boolean> => {
-  try { return JSON.parse(localStorage.getItem('mf_notifications') || '{}'); } catch { return {}; }
-};
-
 export function useNotificationSync(companyId: string) {
   const api = getApi();
   const queryClient = useQueryClient();
@@ -553,6 +551,44 @@ export function useNotificationSync(companyId: string) {
             link: '/historial',
             dedupKey: `op-last-${last.id}`,
           });
+        }
+      }
+
+      if (enabled('weekly_report', false) && new Date().getDay() === 1) {
+        const today = new Date();
+        const start = new Date(today);
+        start.setDate(today.getDate() - 7);
+        const iso = (date: Date) => date.toISOString().slice(0, 10);
+        const page = await api.sales.list(companyId, { startDate: iso(start), endDate: iso(today), page: 1, pageSize: 10000 });
+        const salesWeek = page.data || [];
+        const weekTotal = salesWeek.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+        items.push({
+          type: 'sales',
+          title: 'Reporte semanal',
+          message: `Últimos 7 días: S/ ${weekTotal.toFixed(2)} en ${salesWeek.length} venta${salesWeek.length === 1 ? '' : 's'}.`,
+          link: '/dashboard?tab=resumen',
+          dedupKey: `weekly-${iso(start)}`,
+        });
+      }
+
+      if (enabled('system_updates', false)) {
+        const stored = localStorage.getItem('mf_app_version');
+        if (stored !== APP_VERSION) {
+          let persisted = true;
+          try {
+            localStorage.setItem('mf_app_version', APP_VERSION);
+          } catch {
+            persisted = false;
+          }
+          if (persisted && stored) {
+            items.push({
+              type: 'system',
+              title: 'Sistema actualizado',
+              message: `MatrixFlow fue actualizado a la versión ${APP_VERSION}.`,
+              link: '/configuracion',
+              dedupKey: `sys-${APP_VERSION}`,
+            });
+          }
         }
       }
 
