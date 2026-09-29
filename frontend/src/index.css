@@ -30,8 +30,8 @@
   .sidebar-gradient {
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--color-primary) 88%, #0B1220) 0%,
-      color-mix(in srgb, var(--color-primary) 58%, #060B14) 100%
+      color-mix(in srgb, var(--color-primary-base, var(--color-primary)) 84%, #0B1220) 0%,
+      color-mix(in srgb, var(--color-primary-base, var(--color-primary)) 54%, #060B14) 100%
     );
   }
   .card-shadow {
@@ -61,6 +61,9 @@ html.dark {
   --color-surface: var(--surface-1);
   --color-surface-hover: var(--surface-hover);
   --sidebar-gradient: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+  /* Header/sidebar en tono profundo del acento (misma familia que los botones),
+     no en la variante pastel aclara para texto */
+  --chrome-color: color-mix(in srgb, var(--color-primary-base, #2563EB) 74%, #05070B);
   --tw-ring-offset-color: var(--color-bg);
 }
 /* aplicado por elemento: el reset `* { --tw-ring-offset-color:#fff }` gana sobre la herencia */

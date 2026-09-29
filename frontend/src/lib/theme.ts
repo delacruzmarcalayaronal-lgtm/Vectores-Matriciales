@@ -36,7 +36,10 @@ export const THEME_OPTIONS: ThemeMode[] = [
   'cosmos',
 ];
 
-/** El color de acento lo define el tema (ya no hay selector independiente). */
+/** El color de acento lo define el tema (ya no hay selector independiente).
+  Variantes profundas para que botón (blanco sobre acento), header/sidebar
+  (tono profundo) e iconos (variante clara vía --color-primary-readable)
+  combinen en la misma familia de color. */
 export const THEME_ACCENTS: Record<ThemeMode, string> = {
   light: '#2563EB',
   dark: '#2563EB',
@@ -44,10 +47,10 @@ export const THEME_ACCENTS: Record<ThemeMode, string> = {
   midnight: '#4338CA',
   ocean: '#0E7490',
   matrix: '#15803D',
-  noir: '#94A3B8',
-  navy: '#60A5FA',
-  graphite: '#A1A1AA',
-  cosmos: '#A78BFA',
+  noir: '#475569',
+  navy: '#1D4ED8',
+  graphite: '#3F3F46',
+  cosmos: '#6D28D9',
 };
 
 export function accentForTheme(mode: ThemeMode): string {

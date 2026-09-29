@@ -26,7 +26,7 @@ export function Header({
         'h-16 border-b border-border fixed top-0 left-0 right-0 z-30 flex items-center px-4 sm:px-6 transition-[padding] duration-300 print:hidden',
         hasSidebar && (sidebarExpanded ? 'lg:pl-72' : 'lg:pl-24')
       )}
-      style={{ backgroundColor: 'var(--color-primary)' }}
+      style={{ backgroundColor: 'var(--chrome-color, var(--color-primary))' }}
     >
       {hasSidebar && (
         <button
