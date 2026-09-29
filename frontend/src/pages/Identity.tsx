@@ -22,7 +22,7 @@ import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Table';
 import { useAuth } from '../contexts/useAuth';
 import { ROLE_LABELS, ROLE_ICONS } from '../lib/permissions';
-import { authApi } from '../services/api';
+import { authApi, type FaceVerifyResult } from '../services/api';
 import {
   buildDescriptor,
   clampThreshold,
@@ -51,6 +51,29 @@ const toDataUrl = (source: CanvasImageSource, width: number, height: number): st
   if (!ctx) return '';
   ctx.drawImage(source, 0, 0, width, height);
   return canvas.toDataURL('image/jpeg', 0.85);
+};
+
+const ADJUSTS_KEY = 'mf_face_adjusts';
+
+const clampNum = (value: unknown, min: number, max: number, fallback: number): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(n)));
+};
+
+const readAdjusts = (): { brightness: number; contrast: number; zoom: number } => {
+  try {
+    const raw = localStorage.getItem(ADJUSTS_KEY);
+    if (!raw) return { brightness: 100, contrast: 100, zoom: 100 };
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      brightness: clampNum(parsed.brightness, 50, 150, 100),
+      contrast: clampNum(parsed.contrast, 50, 150, 100),
+      zoom: clampNum(parsed.zoom, 100, 200, 100),
+    };
+  } catch {
+    return { brightness: 100, contrast: 100, zoom: 100 };
+  }
 };
 
 interface Quality {
@@ -139,7 +162,7 @@ export function Identity() {
   const smoothLiveRef = useRef<FaceHit['box'] | null>(null);
   const autoLastRef = useRef(0);
   const autoBusyRef = useRef(false);
-  const liveStateRef = useRef({ faceRegistered: false, manual: false, threshold: 50 });
+  const liveStateRef = useRef({ manual: false, threshold: 50 });
 
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -151,13 +174,13 @@ export function Identity() {
   const [scanMsg, setScanMsg] = useState('');
   const [captureMsg, setCaptureMsg] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
-  const [result, setResult] = useState<{ ok: boolean; score: number; threshold: number } | null>(null);
+  const [result, setResult] = useState<FaceVerifyResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [threshold, setThreshold] = useState(() => clampThreshold(user?.faceThreshold));
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [zoom, setZoom] = useState(100);
+  const [brightness, setBrightness] = useState(() => readAdjusts().brightness);
+  const [contrast, setContrast] = useState(() => readAdjusts().contrast);
+  const [zoom, setZoom] = useState(() => readAdjusts().zoom);
   const [quality, setQuality] = useState<Quality | null>(null);
   const [autoMsg, setAutoMsg] = useState('');
 
@@ -172,11 +195,20 @@ export function Identity() {
 
   useEffect(() => {
     liveStateRef.current = {
-      faceRegistered: !!user?.faceRegistered,
       manual: !!sample || !!descriptor,
       threshold,
     };
   });
+
+  // Los ajustes de captura (brillo, contraste y zoom) se guardan para que
+  // sigan teniendo efecto en la próxima sesión.
+  useEffect(() => {
+    try {
+      localStorage.setItem(ADJUSTS_KEY, JSON.stringify({ brightness, contrast, zoom }));
+    } catch {
+      // almacenamiento no disponible: los ajustes viven solo en memoria
+    }
+  }, [brightness, contrast, zoom]);
 
   useEffect(() => {
     return () => {
@@ -302,7 +334,7 @@ export function Identity() {
           setScanMsg('Centra tu rostro frente a la cámara');
         } else {
           const state = liveStateRef.current;
-          const autoActive = state.faceRegistered && !state.manual;
+          const autoActive = !state.manual;
           setScanMsg(
             autoActive
               ? `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · identificándote automáticamente…`
@@ -314,12 +346,9 @@ export function Identity() {
             void (async () => {
               try {
                 const vector = await buildDescriptor(hit, video);
-                const response = await authApi.verifyFace({ vector, threshold: state.threshold });
-                setResult({
-                  ok: response.ok,
-                  score: Math.round(response.score * 1000) / 1000,
-                  threshold: response.threshold,
-                });
+                // Identificación 1:N: busca tu cuenta entre TODAS las plantillas del sistema
+                const response = await authApi.identifyFace({ vector, threshold: state.threshold });
+                setResult(response);
               } catch {
                 // sin conexión o motor ocupado: se reintenta en el siguiente ciclo
               } finally {
@@ -447,14 +476,12 @@ export function Identity() {
     setBusy(true);
     setSaveMsg('');
     try {
-      const response = await authApi.verifyFace({ vector: descriptor, threshold });
-      setResult({
-        ok: response.ok,
-        score: Math.round(response.score * 1000) / 1000,
-        threshold: response.threshold,
-      });
+      // Identificación 1:N: el sistema recorre TODAS las plantillas registradas
+      // y devuelve la cuenta más parecida a la captura.
+      const response = await authApi.identifyFace({ vector: descriptor, threshold });
+      setResult(response);
     } catch (error) {
-      setSaveMsg(errorMessage(error, 'No se pudo verificar el rostro.'));
+      setSaveMsg(errorMessage(error, 'No se pudo identificar el rostro contra el sistema.'));
       setResult(null);
     } finally {
       setBusy(false);
@@ -497,7 +524,9 @@ export function Identity() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text">Identidad Facial</h1>
-          <p className="text-secondary mt-1">Registra tu rostro con una sola captura y verifícalo con un botón</p>
+          <p className="text-secondary mt-1">
+            Registra tu rostro con una sola captura e identifícalo contra todas las cuentas del sistema
+          </p>
         </div>
         <Link
           to="/dashboard"
@@ -511,7 +540,7 @@ export function Identity() {
       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
         <span className={chip}>
           <ShieldCheck className="w-4 h-4 text-primary" />
-          Solo tu cuenta
+          Comparación en todo el sistema
         </span>
         <span className={chip}>
           <Camera className="w-4 h-4 text-accent" />
@@ -772,8 +801,8 @@ export function Identity() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Identidad detectada</CardTitle>
-              <CardDescription>Perfil asociado a esta plantilla</CardDescription>
+              <CardTitle>Cuenta sesionada</CardTitle>
+              <CardDescription>Datos de tu sesión actual (la coincidencia facial se muestra en el resultado)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
@@ -834,26 +863,36 @@ export function Identity() {
           <Card>
             <CardHeader>
               <CardTitle>Resultado de identificación</CardTitle>
-              <CardDescription>Comparación de tu captura con la plantilla registrada</CardDescription>
+              <CardDescription>
+                Búsqueda de la cuenta más parecida entre todas las plantillas registradas del sistema
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {!result ? (
                 <p className="text-sm text-secondary">
                   {descriptor
-                    ? 'Presiona "Identificar rostro" para comparar tu captura con tu plantilla registrada.'
+                    ? 'Presiona "Identificar rostro" para comparar tu captura contra todas las plantillas del sistema y ver la cuenta más parecida.'
                     : 'Primero captura tu rostro (1 foto) para identificarte.'}
                 </p>
               ) : result.ok ? (
                 <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success/5 p-3">
                   <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-text">Rostro coincidente: {user.name}</p>
-                    <p className="text-xs text-secondary mt-0.5">
-                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% ·{' '}
-                      {GEOM_POINTS} puntos · Identidad verificada correctamente
+                    <p className="text-sm font-medium text-text">
+                      Rostro coincidente: {result.user?.name ?? user.name}
                     </p>
                     <p className="text-xs text-secondary mt-0.5">
-                      {ROLE_ICONS[user.role]} Rango verificado: {ROLE_LABELS[user.role]}
+                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% ·{' '}
+                      {result.points ?? GEOM_POINTS} puntos · Identidad verificada correctamente
+                    </p>
+                    <p className="text-xs text-secondary mt-0.5">
+                      {ROLE_ICONS[result.user?.role ?? user.role]} Rango verificado:{' '}
+                      {ROLE_LABELS[result.user?.role ?? user.role]}
+                    </p>
+                    <p className="text-xs text-secondary mt-0.5">
+                      Cuenta más parecida: DNI {result.user?.dni ?? user.dni} · se comparó contra{' '}
+                      {result.compared ?? 0} plantilla{(result.compared ?? 0) === 1 ? '' : 's'} registrada
+                      {(result.compared ?? 0) === 1 ? '' : 's'} en el sistema
                     </p>
                     <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
@@ -869,9 +908,17 @@ export function Identity() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text">Sin coincidencia</p>
                     <p className="text-xs text-secondary mt-0.5">
-                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% · Ajusta la
-                      iluminación, el contraste o revisa el umbral e inténtalo de nuevo
+                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% ·{' '}
+                      {(result.compared ?? 0) === 0
+                        ? 'aún no hay rostros registrados en el sistema'
+                        : 'ajusta la iluminación, el contraste o revisa el umbral e inténtalo de nuevo'}
                     </p>
+                    {(result.compared ?? 0) > 0 && result.user && (
+                      <p className="text-xs text-secondary mt-0.5">
+                        Cuenta más parecida: {result.user.name} (DNI {result.user.dni}) ·{' '}
+                        {result.compared} plantillas comparadas · no supera el umbral
+                      </p>
+                    )}
                     <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-danger"

@@ -47,5 +47,20 @@ class FaceVerifyOut(BaseModel):
     user: UserOut | None = None
 
 
+class FaceIdentifyIn(BaseModel):
+    vector: list[float]
+    threshold: int | None = None
+
+
+class FaceIdentifyOut(BaseModel):
+    ok: bool
+    score: float
+    threshold: int
+    points: int | None = None
+    registered: bool = False
+    compared: int = 0
+    user: UserOut | None = None
+
+
 class RefreshIn(BaseModel):
     refreshToken: str

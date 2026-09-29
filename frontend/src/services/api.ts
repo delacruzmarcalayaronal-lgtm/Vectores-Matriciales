@@ -172,6 +172,7 @@ export interface FaceVerifyResult {
   threshold: number;
   points?: number | null;
   registered?: boolean;
+  compared?: number;
   user?: User | null;
 }
 
@@ -192,6 +193,8 @@ export const authApi = {
   deleteFace: () => unwrap(api.delete<User>('/auth/face')),
   verifyFace: (data: { vector: number[]; threshold?: number }) =>
     unwrap(api.post<FaceVerifyResult>('/auth/face/verify', data)),
+  identifyFace: (data: { vector: number[]; threshold?: number }) =>
+    unwrap(api.post<FaceVerifyResult>('/auth/face/identify', data)),
 };
 
 export const companiesApi = {

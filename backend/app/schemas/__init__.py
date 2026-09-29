@@ -1,6 +1,8 @@
 from .audit import AuditLogOut
 from .auth import (
     AuthResponse,
+    FaceIdentifyIn,
+    FaceIdentifyOut,
     FaceSaveIn,
     FaceVerifyIn,
     FaceVerifyOut,
@@ -50,6 +52,8 @@ __all__ = [
     "ConsentCreate",
     "ConsentResponse",
     "DashboardStatsOut",
+    "FaceIdentifyIn",
+    "FaceIdentifyOut",
     "FaceSaveIn",
     "FaceVerifyIn",
     "FaceVerifyOut",

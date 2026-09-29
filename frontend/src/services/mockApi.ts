@@ -108,6 +108,32 @@ const isValidDni = (dni: string) => /^\d{8}$/.test(dni);
 const findDemoUser = (dni: string) => DEMO_USERS.find(user => user.dni === dni);
 
 const MOCK_ME_KEY = 'mf_mock_me';
+const MOCK_FACE_KEY = 'mf_mock_face';
+
+type MockFaceMap = Record<string, number[]>;
+
+const readMockFaces = (): MockFaceMap => {
+  try { return JSON.parse(localStorage.getItem(MOCK_FACE_KEY) || '{}') as MockFaceMap; } catch { return {}; }
+};
+
+const writeMockFace = (dni: string, vector: number[]) => {
+  const all = readMockFaces();
+  all[dni] = vector;
+  localStorage.setItem(MOCK_FACE_KEY, JSON.stringify(all));
+};
+
+const mockPearson = (a: number[], b: number[]): number => {
+  if (a.length === 0 || a.length !== b.length) return 0;
+  const meanA = a.reduce((s, v) => s + v, 0) / a.length;
+  const meanB = b.reduce((s, v) => s + v, 0) / b.length;
+  let num = 0; let varA = 0; let varB = 0;
+  for (let i = 0; i < a.length; i++) {
+    const da = a[i] - meanA; const db = b[i] - meanB;
+    num += da * db; varA += da * da; varB += db * db;
+  }
+  if (varA <= 1e-12 || varB <= 1e-12) return 0;
+  return Math.max(-1, Math.min(1, num / Math.sqrt(varA * varB)));
+};
 
 type MockMePatch = { name?: string; role?: Role; avatar?: string | null };
 
@@ -142,27 +168,40 @@ export const mockAuth = {
     if (registered) return sessionFor(dni, registered.name, registered.role);
     throw new Error('DNI no registrado. Crea tu cuenta en la pestaÃ±a Registro.');
   },
-  loginWithFace: async (credentials: { dni?: string } = {}) => {
+  loginWithFace: async (credentials: { dni?: string; faceVector?: number[] | null } = {}) => {
+    await delay(MOCK_DELAY);
     const dni = (credentials.dni || '').trim();
-    if (!dni) {
-      await delay(MOCK_DELAY);
-      const admin = DEMO_USERS[0];
-      return sessionFor(admin.dni, admin.name, admin.role);
+    // Mismo criterio que el backend: sin captura facial real no hay acceso.
+    if (!credentials.faceVector) {
+      throw new Error(
+        'Escanea tu rostro con la cámara para entrar. El acceso facial compara tu captura con las plantillas registradas antes de dejar pasar.',
+      );
+    }
+    if (!isValidDni(dni)) {
+      throw new Error('Ingresa tu DNI para identificarte (el modo demostración no busca entre todas las cuentas).');
+    }
+    const stored = readMockFaces()[dni];
+    if (!stored) {
+      throw new Error('Este DNI no tiene un rostro registrado. Regístralo en Identidad Facial.');
+    }
+    if (mockPearson(stored, credentials.faceVector) * 100 < 50) {
+      throw new Error('El rostro no coincide (confianza por debajo del umbral 50%).');
     }
     return mockAuth.login({ dni });
   },
-  register: async (credentials: { dni: string; name: string }) => {
+  register: async (credentials: { dni: string; name: string; faceVector?: number[] | null }) => {
     await delay(MOCK_DELAY);
     const dni = (credentials.dni || '').trim();
     const name = (credentials.name || '').trim();
-    if (!isValidDni(dni)) throw new Error('El DNI debe tener exactamente 8 dÃ­gitos');
+    if (!isValidDni(dni)) throw new Error('El DNI debe tener exactamente 8 d\u00edgitos');
     if (name.length < 3) throw new Error('Ingresa tu nombre completo');
-    if (findDemoUser(dni)) throw new Error('Este DNI ya tiene una cuenta de demostraciÃ³n');
+    if (findDemoUser(dni)) throw new Error('Este DNI ya tiene una cuenta de demostraci\u00f3n');
     const registered = readRegistered();
     if (registered.some(u => u.dni === dni)) {
       throw new Error('Este DNI ya tiene una cuenta registrada');
     }
     writeRegistered([...registered, { dni, name, role: 'operator' }]);
+    if (credentials.faceVector) writeMockFace(dni, credentials.faceVector);
     return sessionFor(dni, name, 'operator');
   },
   me: async () => {

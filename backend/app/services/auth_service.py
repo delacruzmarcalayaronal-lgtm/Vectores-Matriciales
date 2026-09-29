@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..api.helpers import new_id
 from ..core.security import JWTError, create_access_token, create_refresh_token, decode_token
 from ..models import Company, User, utcnow
-from ..schemas import AuthResponse, FaceVerifyOut, UserOut
+from ..schemas import AuthResponse, FaceIdentifyOut, FaceVerifyOut, UserOut
 from .audit import record_audit
 from .face import (
     DEFAULT_THRESHOLD,
@@ -63,26 +63,16 @@ def login_with_face(
 ) -> User:
     dni = (dni or "").strip()
 
-    # Sin descriptor en la petición se conserva el acceso clásico por DNI.
+    # El acceso facial siempre exige una captura real: sin descriptor no hay
+    # comparación posible y se rechaza (el acceso por DNI es /auth/login).
     if face_vector is None:
-        if not dni:
-            user = db.scalar(select(User).where(User.role == "admin").limit(1))
-            if user is None:
-                raise HTTPException(status_code=400, detail="No hay usuarios administradores disponibles")
-        else:
-            if not valid_dni(dni):
-                raise HTTPException(status_code=400, detail="El DNI debe tener exactamente 8 dígitos")
-            user = db.scalar(select(User).where(User.dni == dni))
-            if user is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="DNI no registrado. Crea tu cuenta en la pestaña Registro.",
-                )
-            if not user.isActive:
-                raise HTTPException(status_code=400, detail="Cuenta desactivada. Contacta al administrador.")
-        record_audit(db, user, action="login_face", module="identidad", request=request)
-        db.commit()
-        return user
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Escanea tu rostro con la cámara para entrar. El acceso facial "
+                "compara tu captura con las plantillas registradas antes de dejar pasar."
+            ),
+        )
 
     try:
         probe = validate_vector(face_vector)
@@ -287,6 +277,61 @@ def verify_face_template(
         points=user.facePoints,
         registered=True,
         user=UserOut.model_validate(user),
+    )
+
+
+def identify_face_template(
+    db: Session,
+    user: User,
+    vector: list[float],
+    threshold: int | None,
+) -> FaceIdentifyOut:
+    """Identificación 1:N: busca en TODO el sistema la plantilla más parecida.
+
+    Compara la captura contra todos los rostros registrados (usuarios activos
+    con plantilla) y devuelve la cuenta más parecida. Si el puntaje supera el
+    umbral (el de la petición o, si no viene, el de la cuenta hallada), la
+    identificación es exitosa; si no, se devuelve igual la más parecida para
+    que la interfaz pueda mostrarla.
+    """
+    try:
+        probe = validate_vector(vector)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    candidates = db.scalars(
+        select(User).where(User.faceTemplate.is_not(None), User.isActive.is_(True))
+    ).all()
+    best: User | None = None
+    best_score = -1.0
+    compared = 0
+    for candidate in candidates:
+        stored = load_face_template(candidate)
+        if stored is None:
+            continue
+        compared += 1
+        score = face_score(stored, probe)
+        # A igual puntaje gana la cuenta propia (empate estable y determinista).
+        if score > best_score or (score == best_score and best is not None and candidate.id == user.id):
+            best, best_score = candidate, score
+
+    if best is None:
+        return FaceIdentifyOut(
+            ok=False, score=0.0,
+            threshold=clamp_threshold(threshold, DEFAULT_THRESHOLD),
+            points=None, registered=user.faceRegistered, compared=0,
+            user=None,
+        )
+
+    effective = clamp_threshold(threshold, best.faceThreshold)
+    return FaceIdentifyOut(
+        ok=score_ok(best_score, effective),
+        score=round(best_score, 4),
+        threshold=effective,
+        points=best.facePoints,
+        registered=user.faceRegistered,
+        compared=compared,
+        user=UserOut.model_validate(best),
     )
 
 

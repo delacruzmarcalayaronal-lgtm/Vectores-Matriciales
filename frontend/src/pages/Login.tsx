@@ -54,7 +54,10 @@ export function Login() {
   const dniRequired = mode === 'register' || method === 'dni';
   const dniOk = dniRequired ? dniValid : dni === '' || dniValid;
   const faceOk = !showScanner || !!faceScan;
-  const canSubmit = dniOk && nameValid && faceOk && !isLoading;
+  // El acceso facial exige una captura real: el escaneo demo (sin descriptor)
+  // no puede entrar. Solo aplica al iniciar sesión con rostro.
+  const faceVectorOk = mode === 'register' || method !== 'face' || !!faceScan?.vector;
+  const canSubmit = dniOk && nameValid && faceOk && faceVectorOk && !isLoading;
 
   if (!authLoading && isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -98,6 +101,12 @@ export function Login() {
     }
     if (!faceOk) {
       setError('Debes validar tu identidad con el escáner facial');
+      return;
+    }
+    if (!faceVectorOk) {
+      setError(
+        'El acceso con rostro compara tu captura con las plantillas registradas: usa la cámara (el escaneo demostración no permite entrar) o accede con tu DNI.',
+      );
       return;
     }
 
@@ -323,6 +332,12 @@ export function Login() {
                   {dniRequired && !dniValid && (
                     <p className="text-xs text-secondary mt-1.5">
                       Ingresa tu DNI para habilitar el escáner facial
+                    </p>
+                  )}
+                  {mode === 'login' && method === 'face' && faceScan && !faceScan.vector && (
+                    <p className="text-xs text-warning bg-warning/5 border border-warning/20 rounded-lg px-3 py-2 mt-1.5">
+                      Escaneo demostración completado, pero para entrar tu rostro debe compararse con una
+                      plantilla registrada: repite el escaneo con la cámara o usa Acceso con DNI.
                     </p>
                   )}
                 </div>

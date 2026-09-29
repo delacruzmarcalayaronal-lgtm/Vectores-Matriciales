@@ -92,14 +92,51 @@ def test_login_face_without_template(client):
     assert "no tiene un rostro registrado" in r.json()["message"]
 
 
-def test_login_face_legacy_without_vector(client):
+def test_login_face_requires_vector(client):
+    """Sin descriptor facial no hay acceso: se elimina el bypass por DNI solo."""
     r = client.post(f"{API}/auth/login/face", json={"dni": "12345678"})
-    assert r.status_code == 200
-    assert r.json()["user"]["role"] == "admin"
+    assert r.status_code == 400
+    assert "Escanea tu rostro" in r.json()["message"]
 
     r2 = client.post(f"{API}/auth/login/face", json={})
-    assert r2.status_code == 200
-    assert r2.json()["user"]["role"] == "admin"
+    assert r2.status_code == 400
+    assert "Escanea tu rostro" in r2.json()["message"]
+
+
+def test_identify_one_to_many(client, admin_token):
+    """La identificación busca en TODO el sistema y devuelve la cuenta más parecida."""
+    ok = client.post(
+        f"{API}/auth/face/identify",
+        headers=_auth(admin_token),
+        json={"vector": ADMIN_VECTOR_JITTER},
+    )
+    assert ok.status_code == 200, ok.text
+    body = ok.json()
+    assert body["ok"] is True
+    assert body["user"]["dni"] == "12345678", "la plantilla más parecida es la propia"
+    assert body["compared"] >= 1
+    assert body["score"] >= 0.9
+
+    other = client.post(
+        f"{API}/auth/face/identify",
+        headers=_auth(admin_token),
+        json={"vector": REGISTER_VECTOR},
+    )
+    assert other.status_code == 200, other.text
+    ob = other.json()
+    assert ob["ok"] is True
+    assert ob["user"]["dni"] == "77777777", "encuentra la cuenta ajena más parecida"
+
+    miss = client.post(
+        f"{API}/auth/face/identify",
+        headers=_auth(admin_token),
+        json={"vector": OTHER_VECTOR},
+    )
+    assert miss.status_code == 200
+    mb = miss.json()
+    assert mb["ok"] is False, "ninguna plantilla supera el umbral"
+    assert mb["user"] is not None, "aun sin coincidencia devuelve la más parecida"
+    assert mb["compared"] >= 2
 
 
 def test_login_face_one_to_many(client):

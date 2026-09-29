@@ -9,6 +9,8 @@ from ...core.database import get_db
 from ...models import User
 from ...schemas import (
     AuthResponse,
+    FaceIdentifyIn,
+    FaceIdentifyOut,
     FaceSaveIn,
     FaceVerifyIn,
     FaceVerifyOut,
@@ -78,6 +80,16 @@ def verify_face(
     db: Session = Depends(get_db),
 ) -> FaceVerifyOut:
     return auth_service.verify_face_template(db, user, body.vector, body.threshold)
+
+
+@router.post("/face/identify", response_model=FaceIdentifyOut)
+def identify_face(
+    body: FaceIdentifyIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> FaceIdentifyOut:
+    """Identificación 1:N: devuelve la cuenta cuya plantilla es la más parecida."""
+    return auth_service.identify_face_template(db, user, body.vector, body.threshold)
 
 
 @router.post("/logout")
