@@ -801,7 +801,7 @@ export function Settings() {
       <div
         data-testid="settings-watermark"
         aria-hidden="true"
-        className="pointer-events-none select-none text-center pt-6 pb-2 text-[10px] font-medium text-text opacity-[0.12]"
+        className="pointer-events-none select-none text-center pt-6 pb-2 text-[10px] font-medium text-text opacity-[0.2]"
       >
         <p className="uppercase tracking-[0.4em]">MatrixFlow Enterprise</p>
         <p className="tracking-[0.12em]">Desarrollado por Ronal Anyelo De la Cruz Marcalaya</p>
