@@ -237,6 +237,10 @@ const MOUTH_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 
 const MOUTH_INNER = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
 const LEFT_IRIS = [468, 469, 470, 471, 472];
 const RIGHT_IRIS = [473, 474, 475, 476, 477];
+/* Cejas (recorrido cerrado: borde inferior externo→interno y superior
+   interno→externo; índices verificados con un frame real del mesh). */
+const LEFT_BROW = [46, 53, 52, 65, 55, 107, 66, 105, 63, 70];
+const RIGHT_BROW = [276, 283, 282, 295, 285, 336, 296, 334, 293, 300];
 
 function strokePath(
   ctx: CanvasRenderingContext2D,
@@ -377,14 +381,14 @@ export function drawFaceOverlay(
     if (point.z > zMax) zMax = point.z;
   }
   const zSpan = zMax - zMin || 1;
-  const baseRadius = Math.max(1, Math.min(2.4, faceW * 0.0075));
+  const baseRadius = Math.max(0.5, Math.min(1.4, faceW * 0.005));
   ctx.save();
   ctx.globalAlpha = 0.92;
   for (const point of landmarks) {
     const t = (zMax - point.z) / zSpan;
     ctx.fillStyle = depthColor(t);
     ctx.beginPath();
-    ctx.arc(px(point.x), py(point.y), baseRadius * (0.75 + 0.7 * t), 0, Math.PI * 2);
+    ctx.arc(px(point.x), py(point.y), baseRadius * (0.7 + 0.55 * t), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -396,7 +400,7 @@ export function drawFaceOverlay(
     ctx.shadowColor = '#22C55E';
     ctx.shadowBlur = glow;
   }
-  const noseRadius = Math.max(1.8, Math.min(4.2, faceW * 0.014));
+  const noseRadius = Math.max(1.2, Math.min(2.6, faceW * 0.008));
   for (const index of [...NOSE_LINE, ...NOSE_BASE]) {
     const point = landmarks[index];
     if (!point) continue;
@@ -438,8 +442,8 @@ export function drawFaceOverlay(
   strokePath(ctx, landmarks, LEFT_EYE, px, py);
   strokePath(ctx, landmarks, RIGHT_EYE, px, py);
   ctx.shadowBlur = 0;
-  const irisRadius = Math.max(1.2, Math.min(2.6, faceW * 0.0065));
-  const irisCenterRadius = Math.max(1.5, Math.min(3.2, faceW * 0.008));
+  const irisRadius = Math.max(0.9, Math.min(1.8, faceW * 0.005));
+  const irisCenterRadius = Math.max(1, Math.min(2.2, faceW * 0.006));
   for (const set of [LEFT_IRIS, RIGHT_IRIS]) {
     ctx.fillStyle = '#FF6B6B';
     let cx = 0;
@@ -462,5 +466,21 @@ export function drawFaceOverlay(
       ctx.fill();
     }
   }
+  ctx.restore();
+
+  // Cejas: relleno violeta translúcido + contorno
+  ctx.save();
+  ctx.fillStyle = 'rgba(168, 85, 247, 0.34)';
+  fillPath(ctx, landmarks, LEFT_BROW, px, py);
+  fillPath(ctx, landmarks, RIGHT_BROW, px, py);
+  ctx.strokeStyle = '#A855F7';
+  ctx.lineWidth = Math.max(1.2, Math.min(2.4, faceW * 0.007));
+  ctx.lineJoin = 'round';
+  if (stable) {
+    ctx.shadowColor = '#A855F7';
+    ctx.shadowBlur = glow;
+  }
+  strokePath(ctx, landmarks, LEFT_BROW, px, py);
+  strokePath(ctx, landmarks, RIGHT_BROW, px, py);
   ctx.restore();
 }
