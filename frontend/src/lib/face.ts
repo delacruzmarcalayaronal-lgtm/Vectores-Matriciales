@@ -5,17 +5,12 @@ type VisionFileset = Awaited<
 >;
 
 export const GEOM_POINTS = 400;
-export const GEOM_DIM = GEOM_POINTS * 3;
-export const APP_SIZE = 24;
-export const APP_DIM = APP_SIZE * APP_SIZE;
-export const VECTOR_DIM = GEOM_DIM + APP_DIM;
+export const EMBED_DIM = 1024;
+export const VECTOR_DIM = EMBED_DIM;
 
 export const MIN_THRESHOLD = 30;
-export const MAX_THRESHOLD = 70;
-export const DEFAULT_THRESHOLD = 50;
-
-const GEOM_WEIGHT = 0.15;
-const APP_WEIGHT = 0.85;
+export const MAX_THRESHOLD = 85;
+export const DEFAULT_THRESHOLD = 60;
 
 const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
 const MODEL_URL =
@@ -114,111 +109,121 @@ export async function detectFace(source: FaceSource): Promise<FaceHit | null> {
 
 const round5 = (value: number) => Math.round(value * 1e5) / 1e5;
 
-function geometryVector(landmarks: FacePoint[]): number[] {
-  const points = landmarks.slice(0, GEOM_POINTS);
-  let cx = 0;
-  let cy = 0;
-  for (const point of points) {
-    cx += point.x;
-    cy += point.y;
-  }
-  cx /= points.length || 1;
-  cy /= points.length || 1;
-  const leftEye = points[33];
-  const rightEye = points[263];
-  let scale = 0.1;
-  if (leftEye && rightEye) {
-    const dx = leftEye.x - rightEye.x;
-    const dy = leftEye.y - rightEye.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 1e-4) scale = dist;
-  }
-  const out: number[] = [];
-  for (let i = 0; i < GEOM_POINTS; i += 1) {
-    const point = points[i];
-    if (point) {
-      out.push(round5((point.x - cx) / scale), round5((point.y - cy) / scale), round5(point.z / scale));
-    } else {
-      out.push(0, 0, 0);
+/* ---------------------------------------------------------------------------
+   Identidad facial: embedding ArcFace (@vladmandic/human, modelo faceres
+   1024-d). A diferencia de la geometría/apariencia previa, el embedding es
+   invariante al encuadre, la resolución y el fondo: mide quién es la persona,
+   no cómo se ve la foto. La plantilla y la sonda se comparan con coseno.
+   --------------------------------------------------------------------------- */
+
+type HumanFace = { embedding?: ArrayLike<number> };
+type HumanInstance = {
+  load(): Promise<unknown>;
+  detect(input: FaceSource): Promise<{ face?: HumanFace[] }>;
+};
+type HumanCtor = new (config: Record<string, unknown>) => HumanInstance;
+
+const HUMAN_SCRIPT = '/models/human/human.js';
+const HUMAN_BASE = '/models/human/';
+
+let humanPromise: Promise<HumanInstance | null> | null = null;
+
+function loadHumanScript(): Promise<void> {
+  const scope = window as unknown as { Human?: unknown };
+  if (scope.Human) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-human-engine]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('motor humano no cargó')));
+      return;
     }
-  }
-  return out;
+    const script = document.createElement('script');
+    script.src = HUMAN_SCRIPT;
+    script.dataset.humanEngine = 'true';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('motor humano no cargó'));
+    document.head.appendChild(script);
+  });
 }
 
-async function appearanceVector(hit: FaceHit, source: FaceSource): Promise<number[]> {
-  const width = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
-  const height = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
-  const out: number[] = [];
-  if (!width || !height) return new Array(APP_DIM).fill(0);
-  const margin = 0.18;
-  let x0 = hit.box.x - hit.box.width * margin;
-  let y0 = hit.box.y - hit.box.height * margin;
-  let size = Math.max(hit.box.width * (1 + margin * 2), hit.box.height * (1 + margin * 2));
-  x0 = Math.max(0, Math.min(x0, 1 - size));
-  y0 = Math.max(0, Math.min(y0, 1 - size));
-  size = Math.min(size, 1);
-  const canvas = document.createElement('canvas');
-  canvas.width = APP_SIZE;
-  canvas.height = APP_SIZE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return new Array(APP_DIM).fill(0);
-  ctx.drawImage(
-    source,
-    x0 * width,
-    y0 * height,
-    size * width,
-    size * height,
-    0,
-    0,
-    APP_SIZE,
-    APP_SIZE,
-  );
-  const { data } = ctx.getImageData(0, 0, APP_SIZE, APP_SIZE);
-  for (let i = 0; i < data.length; i += 4) {
-    out.push(round5((0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255));
+export function getEmbedder(): Promise<HumanInstance | null> {
+  if (!humanPromise) {
+    humanPromise = (async () => {
+      try {
+        await loadHumanScript();
+        const scope = window as unknown as { Human?: HumanCtor | { Human: HumanCtor } };
+        const raw = scope.Human;
+        const Human = (typeof raw === 'function' ? raw : raw ? raw.Human : undefined) as
+          | HumanCtor
+          | undefined;
+        if (!Human) return null;
+        const human = new Human({
+          modelBasePath: HUMAN_BASE,
+          debug: false,
+          async: true,
+          warmup: false,
+          face: {
+            enabled: true,
+            detector: { enabled: true, modelPath: 'blazeface.json' },
+            mesh: { enabled: false },
+            iris: { enabled: false },
+            attention: { enabled: false },
+            emotion: { enabled: false },
+            liveness: { enabled: false },
+            antispoof: { enabled: false },
+            description: { enabled: true },
+          },
+          hand: { enabled: false },
+          body: { enabled: false },
+          gesture: { enabled: false },
+        });
+        await human.load();
+        return human;
+      } catch {
+        return null;
+      }
+    })().catch(() => null);
   }
-  return out;
+  return humanPromise;
 }
 
-export async function buildDescriptor(hit: FaceHit, source: FaceSource): Promise<number[]> {
-  const [geometry, appearance] = await Promise.all([
-    Promise.resolve(geometryVector(hit.landmarks)),
-    appearanceVector(hit, source),
-  ]);
-  return [...geometry, ...appearance];
+function normalize(values: number[]): number[] | null {
+  let sum = 0;
+  for (const value of values) sum += value * value;
+  if (sum <= 1e-12) return null;
+  const inv = 1 / Math.sqrt(sum);
+  return values.map(value => round5(value * inv));
 }
 
-function pearson(a: number[], b: number[]): number {
-  const n = a.length;
-  if (n === 0 || n !== b.length) return 0;
-  let meanA = 0;
-  let meanB = 0;
-  for (let i = 0; i < n; i += 1) {
-    meanA += a[i];
-    meanB += b[i];
+/* Descriptor de identidad (embedding 1024-d normalizado). Devuelve null si
+   el motor no está disponible o la imagen no contiene un rostro. */
+export async function embeddingFrom(source: FaceSource): Promise<number[] | null> {
+  const human = await getEmbedder();
+  if (!human) return null;
+  try {
+    const result = await human.detect(source);
+    const face = result.face && result.face[0];
+    const embedding = face && face.embedding;
+    if (!embedding || embedding.length !== EMBED_DIM) return null;
+    const values: number[] = [];
+    for (let i = 0; i < EMBED_DIM; i += 1) values.push(Number(embedding[i]));
+    return normalize(values);
+  } catch {
+    return null;
   }
-  meanA /= n;
-  meanB /= n;
-  let num = 0;
-  let varA = 0;
-  let varB = 0;
-  for (let i = 0; i < n; i += 1) {
-    const da = a[i] - meanA;
-    const db = b[i] - meanB;
-    num += da * db;
-    varA += da * da;
-    varB += db * db;
-  }
-  if (varA <= 1e-12 || varB <= 1e-12) return 0;
-  const corr = num / Math.sqrt(varA * varB);
-  return Math.max(-1, Math.min(1, corr));
 }
 
 export function faceScore(stored: number[], probe: number[]): number {
-  if (stored.length !== VECTOR_DIM || probe.length !== VECTOR_DIM) return 0;
-  const geom = Math.max(0, pearson(stored.slice(0, GEOM_DIM), probe.slice(0, GEOM_DIM)));
-  const app = Math.max(0, pearson(stored.slice(GEOM_DIM), probe.slice(GEOM_DIM)));
-  return Math.max(0, Math.min(1, GEOM_WEIGHT * geom + APP_WEIGHT * app));
+  if (!Array.isArray(stored) || !Array.isArray(probe)) return 0;
+  if (stored.length !== EMBED_DIM || probe.length !== EMBED_DIM) return 0;
+  const a = normalize(stored);
+  const b = normalize(probe);
+  if (!a || !b) return 0;
+  let dot = 0;
+  for (let i = 0; i < EMBED_DIM; i += 1) dot += a[i] * b[i];
+  return Math.max(0, Math.min(1, dot));
 }
 
 export function clampThreshold(value?: number | null, fallback?: number | null): number {
@@ -292,8 +297,8 @@ function fillPath(
 }
 
 /* Rotación de cabeza (yaw) aproximada: desplazamiento horizontal de la punta
-  de la nariz respecto al centro de los ojos, normalizado por la distancia
-  interpupilar. ±FRONTAL_GIRO_LIMIT ≈ ±20° todavía considerado "de frente". */
+   de la nariz respecto al centro de los ojos, normalizado por la distancia
+   interpupilar. ±FRONTAL_GIRO_LIMIT ≈ ±20° todavía considerado "de frente". */
 export const FRONTAL_GIRO_LIMIT = 0.22;
 
 export function estimateGiro(landmarks: FacePoint[]): number {
@@ -307,7 +312,7 @@ export function estimateGiro(landmarks: FacePoint[]): number {
 }
 
 /* Paleta de profundidad del overlay: lo lejano en cian, la superficie en
-  verde y el relieve (frente, mentón, labios) en ámbar/naranja. */
+   verde y el relieve (frente, mentón, labios) en ámbar/naranja. */
 const DEPTH_STOPS: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
   [0, [6, 182, 212]],
   [0.4, [34, 197, 94]],
@@ -463,7 +468,7 @@ export function drawFaceOverlay(
     if (count) {
       ctx.fillStyle = '#F43F5E';
       ctx.beginPath();
-      ctx.arc(px(cx / count), py(cy / count), irisCenterRadius, 0, Math.PI * 2);
+      ctx.arc(cx / count, cy / count, irisCenterRadius, 0, Math.PI * 2);
       ctx.fill();
     }
   }

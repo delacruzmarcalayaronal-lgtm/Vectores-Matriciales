@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from app.services.face import GEOM_DIM, MAX_POINTS, VECTOR_DIM
+from app.services.face import EMBED_DIM, MAX_POINTS, VECTOR_DIM
 
 API = "/api/v1"
 
@@ -38,7 +38,7 @@ def test_register_with_face(client):
     user = r.json()["user"]
     assert user["faceRegistered"] is True
     assert user["facePoints"] == MAX_POINTS
-    assert user["faceThreshold"] == 50
+    assert user["faceThreshold"] == 60
 
     r2 = client.post(f"{API}/auth/login", json={"dni": "77777777"})
     assert r2.status_code == 200
@@ -64,7 +64,7 @@ def test_save_face_template(client, admin_token):
     user = r.json()
     assert user["faceRegistered"] is True
     assert user["facePoints"] == MAX_POINTS, "nunca se guardan más de 400 puntos"
-    assert user["faceThreshold"] == 30, "el umbral se recorta al rango 30-70"
+    assert user["faceThreshold"] == 30, "el umbral se recorta al rango 30-85"
 
     r2 = client.post(
         f"{API}/auth/face",
@@ -72,7 +72,7 @@ def test_save_face_template(client, admin_token):
         json={"vector": ADMIN_VECTOR, "points": MAX_POINTS, "threshold": 95},
     )
     assert r2.status_code == 200
-    assert r2.json()["faceThreshold"] == 70
+    assert r2.json()["faceThreshold"] == 85
     assert r2.json()["facePoints"] == MAX_POINTS
 
 
@@ -164,7 +164,7 @@ def test_verify_own_face(client, admin_token):
     assert body["registered"] is True
     assert body["ok"] is True
     assert body["score"] >= 0.9
-    assert body["threshold"] == 70
+    assert body["threshold"] == 85
     assert body["user"]["role"] == "admin"
 
     bad = client.post(
@@ -212,7 +212,7 @@ def test_login_face_rejects_bad_vector(client):
     assert str(VECTOR_DIM) in r.json()["message"]
 
 
-def test_geometry_split_is_reserved():
-    assert GEOM_DIM == 400 * 3
-    assert VECTOR_DIM == GEOM_DIM + 24 * 24
+def test_embedding_dim_is_embed():
+    assert EMBED_DIM == 1024
+    assert VECTOR_DIM == EMBED_DIM
 

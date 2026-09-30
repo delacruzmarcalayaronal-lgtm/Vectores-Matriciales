@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, CheckCircle2, Loader2, RefreshCw, ScanFace, ShieldAlert, Target } from 'lucide-react';
-import { buildDescriptor, detectFace, drawFaceOverlay, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
+import { detectFace, drawFaceOverlay, embeddingFrom, estimateGiro, FRONTAL_GIRO_LIMIT, GEOM_POINTS, type FaceHit } from '../../lib/face';
 
 export interface FaceScanResult {
   vector: number[] | null;
@@ -29,7 +29,9 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
   const stableRef = useRef(0);
   const startedRef = useRef(0);
   const busyRef = useRef(false);
+  const embedBusyRef = useRef(false);
   const framesRef = useRef(0);
+  const samplesRef = useRef<number[][]>([]);
 
   const [status, setStatus] = useState<ScanStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -66,7 +68,22 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
       busyRef.current = true;
       clearTimers();
       try {
-        const vector = await buildDescriptor(hit, video);
+        /* Promedio de los frames estables: un solo frame tiene mucha varianza
+           (encuadre/iluminación) y hunde el puntaje de la misma persona. */
+        const samples = samplesRef.current;
+        let vector: number[];
+        if (samples.length >= 2) {
+          const dim = samples[0].length;
+          const avg = new Array<number>(dim).fill(0);
+          for (const sample of samples) {
+            for (let i = 0; i < dim; i += 1) avg[i] += sample[i];
+          }
+          vector = avg.map(value => Math.round((value / samples.length) * 1e5) / 1e5);
+        } else {
+          const fresh = await embeddingFrom(video);
+          if (!fresh) throw new Error('sin embedding');
+          vector = fresh;
+        }
         stopCamera();
         setStatus('success');
         setProgress(100);
@@ -159,6 +176,22 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
           box.width >= 0.12 && box.width <= 0.95 && Math.abs(cx - 0.5) < 0.28 && Math.abs(cy - 0.5) < 0.28;
         if (wellFramed) {
           stableRef.current += 1;
+          if (!embedBusyRef.current) {
+            embedBusyRef.current = true;
+            void embeddingFrom(current)
+              .then(sample => {
+                if (sample) {
+                  samplesRef.current.push(sample);
+                  if (samplesRef.current.length > 12) samplesRef.current.shift();
+                }
+              })
+              .catch(() => {
+                // frame descartado: el promedio sigue con los demás
+              })
+              .finally(() => {
+                embedBusyRef.current = false;
+              });
+          }
         } else {
           stableRef.current = Math.max(0, stableRef.current - 1);
           setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Centra tu rostro frente a la cámara');
@@ -197,6 +230,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
       smoothBoxRef.current = null;
       startedRef.current = Date.now();
       framesRef.current = 0;
+      samplesRef.current = [];
       setHud({ points: 0, frames: 0, giro: 0 });
       setStatus('scanning');
       setProgress(0);
@@ -250,6 +284,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
     hitRef.current = null;
     smoothBoxRef.current = null;
     framesRef.current = 0;
+    samplesRef.current = [];
     setHud({ points: 0, frames: 0, giro: 0 });
     setStatus('idle');
     setProgress(0);

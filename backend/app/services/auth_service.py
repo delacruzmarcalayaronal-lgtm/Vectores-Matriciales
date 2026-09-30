@@ -13,6 +13,7 @@ from ..schemas import AuthResponse, FaceIdentifyOut, FaceVerifyOut, UserOut
 from .audit import record_audit
 from .face import (
     DEFAULT_THRESHOLD,
+    FACE_TEMPLATE_VERSION,
     MAX_POINTS,
     clamp_threshold,
     face_score,
@@ -92,6 +93,14 @@ def login_with_face(
             raise HTTPException(status_code=400, detail="Cuenta desactivada. Contacta al administrador.")
         stored = load_face_template(user)
         if stored is None:
+            if user.faceTemplate:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Tu rostro quedó en una versión anterior del escáner y ya no "
+                        "es válido. Vuelve a registrarlo en Identidad Facial."
+                    ),
+                )
             raise HTTPException(
                 status_code=400,
                 detail="Este DNI no tiene un rostro registrado. Regístralo en Identidad Facial.",
@@ -169,9 +178,10 @@ def register_user(
     points: int | None = None
     if face_vector is not None:
         try:
-            template_json = json.dumps(validate_vector(face_vector))
+            cleaned = validate_vector(face_vector)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        template_json = json.dumps({"v": FACE_TEMPLATE_VERSION, "d": cleaned})
         points = max(1, min(MAX_POINTS, int(face_points or MAX_POINTS)))
     company = db.scalar(select(Company).limit(1))
     user = User(
@@ -198,12 +208,20 @@ def register_user(
 
 
 def load_face_template(user: User) -> list[float] | None:
+    """Lee la plantilla vigente (formato {"v": 3, "d": [...]}: embedding 1024-d).
+
+    Los formatos anteriores (v1/v2, y la lista plana sin versión) quedan
+    invalidados a propósito: el descriptor cambió de diseño y esas plantillas
+    ya no son comparables, así que el usuario debe volver a registrar su rostro.
+    """
     if not user.faceTemplate:
         return None
     try:
         data = json.loads(user.faceTemplate)
-        return [float(x) for x in data]
-    except (ValueError, TypeError, json.JSONDecodeError):
+        if not isinstance(data, dict) or int(data.get("v", 0)) != FACE_TEMPLATE_VERSION:
+            return None
+        return [float(x) for x in data["d"]]
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
         return None
 
 
@@ -216,10 +234,10 @@ def save_face_template(
     request: Request,
 ) -> User:
     try:
-        template_json = json.dumps(validate_vector(vector))
+        cleaned = validate_vector(vector)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    user.faceTemplate = template_json
+    user.faceTemplate = json.dumps({"v": FACE_TEMPLATE_VERSION, "d": cleaned})
     user.facePoints = max(1, min(MAX_POINTS, int(points or MAX_POINTS)))
     user.faceThreshold = clamp_threshold(threshold, DEFAULT_THRESHOLD)
     user.faceRegisteredAt = utcnow()

@@ -24,10 +24,10 @@ import { useAuth } from '../contexts/useAuth';
 import { ROLE_LABELS, ROLE_ICONS } from '../lib/permissions';
 import { authApi, type FaceVerifyResult } from '../services/api';
 import {
-  buildDescriptor,
   clampThreshold,
   detectFace,
   drawFaceOverlay,
+  embeddingFrom,
   GEOM_POINTS,
   MAX_THRESHOLD,
   MIN_THRESHOLD,
@@ -345,7 +345,8 @@ export function Identity() {
             autoBusyRef.current = true;
             void (async () => {
               try {
-                const vector = await buildDescriptor(hit, video);
+                const vector = await embeddingFrom(video);
+                if (!vector) return;
                 // Identificación 1:N: busca tu cuenta entre TODAS las plantillas del sistema
                 const response = await authApi.identifyFace({ vector, threshold: state.threshold });
                 setResult(response);
@@ -380,15 +381,36 @@ export function Identity() {
       return;
     }
     setCaptureMsg('');
-    const hit = liveHitRef.current && source === video ? liveHitRef.current : await safeDetect(source);
-    if (!hit) {
-      setCaptureMsg('No se detectó rostro en la imagen. Corrige el encuadre e inténtalo de nuevo.');
-      setSample(null);
-      setDescriptor(null);
-      return;
-    }
     try {
-      const vector = await buildDescriptor(hit, source);
+      /* Con cámara se promedian 5 capturas: una sola captura tiene varianza
+         de encuadre/iluminación y hace que el mismo rostro puntúe bajo. */
+      const isVideo = source === video;
+      const rounds = isVideo ? 5 : 1;
+      const samples: number[][] = [];
+      for (let i = 0; i < rounds; i += 1) {
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 140));
+        const hit = isVideo ? await safeDetect(video) : await safeDetect(source);
+        if (!hit) continue;
+        const sample = await embeddingFrom(source);
+        if (sample) samples.push(sample);
+      }
+      if (samples.length === 0) {
+        setCaptureMsg('No se detectó rostro en la imagen. Corrige el encuadre e inténtalo de nuevo.');
+        setSample(null);
+        setDescriptor(null);
+        return;
+      }
+      let vector: number[];
+      if (samples.length >= 2) {
+        const dim = samples[0].length;
+        const avg = new Array<number>(dim).fill(0);
+        for (const sample of samples) {
+          for (let d = 0; d < dim; d += 1) avg[d] += sample[d];
+        }
+        vector = avg.map(value => Math.round((value / samples.length) * 1e5) / 1e5);
+      } else {
+        vector = samples[0];
+      }
       const frame = await renderProbe();
       setSample(frame || null);
       setDescriptor(vector);
@@ -507,6 +529,17 @@ export function Identity() {
   };
 
   if (!user) return null;
+
+  /* El resultado se reevalúa en vivo contra el umbral del slider: mover el
+     umbral cambia al instante la tarjeta entre "Rostro coincidente" y
+     "Sin coincidencia" sin volver a identificar. */
+  const liveResult = result
+    ? {
+        ...result,
+        threshold: clampThreshold(threshold),
+        ok: Math.round(result.score * 100) >= clampThreshold(threshold),
+      }
+    : null;
 
   const hasTemplate = !!user.faceRegistered;
   const registeredAt = user.faceRegisteredAt || null;
@@ -868,36 +901,36 @@ export function Identity() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!result ? (
+              {!liveResult ? (
                 <p className="text-sm text-secondary">
                   {descriptor
                     ? 'Presiona "Identificar rostro" para comparar tu captura contra todas las plantillas del sistema y ver la cuenta más parecida.'
                     : 'Primero captura tu rostro (1 foto) para identificarte.'}
                 </p>
-              ) : result.ok ? (
+              ) : liveResult.ok ? (
                 <div className="flex items-start gap-3 rounded-lg border border-success/30 bg-success/5 p-3">
                   <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text">
-                      Rostro coincidente: {result.user?.name ?? user.name}
+                      Rostro coincidente: {liveResult.user?.name ?? user.name}
                     </p>
                     <p className="text-xs text-secondary mt-0.5">
-                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% ·{' '}
-                      {result.points ?? GEOM_POINTS} puntos · Identidad verificada correctamente
+                      Confianza {Math.round(liveResult.score * 100)}% · Umbral {liveResult.threshold}% ·{' '}
+                      {liveResult.points ?? GEOM_POINTS} puntos · Identidad verificada correctamente
                     </p>
                     <p className="text-xs text-secondary mt-0.5">
-                      {ROLE_ICONS[result.user?.role ?? user.role]} Rango verificado:{' '}
-                      {ROLE_LABELS[result.user?.role ?? user.role]}
+                      {ROLE_ICONS[liveResult.user?.role ?? user.role]} Rango verificado:{' '}
+                      {ROLE_LABELS[liveResult.user?.role ?? user.role]}
                     </p>
                     <p className="text-xs text-secondary mt-0.5">
-                      Cuenta más parecida: DNI {result.user?.dni ?? user.dni} · se comparó contra{' '}
-                      {result.compared ?? 0} plantilla{(result.compared ?? 0) === 1 ? '' : 's'} registrada
-                      {(result.compared ?? 0) === 1 ? '' : 's'} en el sistema
+                      Cuenta más parecida: DNI {liveResult.user?.dni ?? user.dni} · se comparó contra{' '}
+                      {liveResult.compared ?? 0} plantilla{(liveResult.compared ?? 0) === 1 ? '' : 's'} registrada
+                      {(liveResult.compared ?? 0) === 1 ? '' : 's'} en el sistema
                     </p>
                     <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-success"
-                        style={{ width: `${Math.min(100, Math.round(result.score * 100))}%` }}
+                        style={{ width: `${Math.min(100, Math.round(liveResult.score * 100))}%` }}
                       />
                     </div>
                   </div>
@@ -908,21 +941,21 @@ export function Identity() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text">Sin coincidencia</p>
                     <p className="text-xs text-secondary mt-0.5">
-                      Confianza {Math.round(result.score * 100)}% · Umbral {result.threshold}% ·{' '}
-                      {(result.compared ?? 0) === 0
+                      Confianza {Math.round(liveResult.score * 100)}% · Umbral {liveResult.threshold}% ·{' '}
+                      {(liveResult.compared ?? 0) === 0
                         ? 'aún no hay rostros registrados en el sistema'
                         : 'ajusta la iluminación, el contraste o revisa el umbral e inténtalo de nuevo'}
                     </p>
-                    {(result.compared ?? 0) > 0 && result.user && (
+                    {(liveResult.compared ?? 0) > 0 && liveResult.user && (
                       <p className="text-xs text-secondary mt-0.5">
-                        Cuenta más parecida: {result.user.name} (DNI {result.user.dni}) ·{' '}
-                        {result.compared} plantillas comparadas · no supera el umbral
+                        Cuenta más parecida: {liveResult.user.name} (DNI {liveResult.user.dni}) ·{' '}
+                        {liveResult.compared} plantillas comparadas · no supera el umbral
                       </p>
                     )}
                     <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-danger"
-                        style={{ width: `${Math.min(100, Math.round(result.score * 100))}%` }}
+                        style={{ width: `${Math.min(100, Math.round(liveResult.score * 100))}%` }}
                       />
                     </div>
                   </div>

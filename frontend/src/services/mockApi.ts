@@ -23,6 +23,7 @@ import type {
   ConsentRecord,
   TrackingStatus,
 } from './locationApi';
+import { faceScore } from '../lib/face';
 
 const MOCK_DELAY = 300;
 
@@ -122,19 +123,6 @@ const writeMockFace = (dni: string, vector: number[]) => {
   localStorage.setItem(MOCK_FACE_KEY, JSON.stringify(all));
 };
 
-const mockPearson = (a: number[], b: number[]): number => {
-  if (a.length === 0 || a.length !== b.length) return 0;
-  const meanA = a.reduce((s, v) => s + v, 0) / a.length;
-  const meanB = b.reduce((s, v) => s + v, 0) / b.length;
-  let num = 0; let varA = 0; let varB = 0;
-  for (let i = 0; i < a.length; i++) {
-    const da = a[i] - meanA; const db = b[i] - meanB;
-    num += da * db; varA += da * da; varB += db * db;
-  }
-  if (varA <= 1e-12 || varB <= 1e-12) return 0;
-  return Math.max(-1, Math.min(1, num / Math.sqrt(varA * varB)));
-};
-
 type MockMePatch = { name?: string; role?: Role; avatar?: string | null };
 
 const readMeOverrides = (): Record<string, MockMePatch> => {
@@ -184,8 +172,8 @@ export const mockAuth = {
     if (!stored) {
       throw new Error('Este DNI no tiene un rostro registrado. Regístralo en Identidad Facial.');
     }
-    if (mockPearson(stored, credentials.faceVector) * 100 < 50) {
-      throw new Error('El rostro no coincide (confianza por debajo del umbral 50%).');
+    if (faceScore(stored, credentials.faceVector) * 100 < 60) {
+      throw new Error('El rostro no coincide (confianza por debajo del umbral 60%).');
     }
     return mockAuth.login({ dni });
   },
