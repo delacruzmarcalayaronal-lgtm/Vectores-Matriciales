@@ -25,6 +25,7 @@ import { ROLE_LABELS, ROLE_ICONS } from '../lib/permissions';
 import { authApi, type FaceVerifyResult } from '../services/api';
 import {
   clampThreshold,
+  DEFAULT_THRESHOLD,
   detectFace,
   drawFaceOverlay,
   embeddingFrom,
@@ -162,7 +163,7 @@ export function Identity() {
   const smoothLiveRef = useRef<FaceHit['box'] | null>(null);
   const autoLastRef = useRef(0);
   const autoBusyRef = useRef(false);
-  const liveStateRef = useRef({ manual: false, threshold: 50 });
+  const liveStateRef = useRef({ manual: false, threshold: DEFAULT_THRESHOLD });
 
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
