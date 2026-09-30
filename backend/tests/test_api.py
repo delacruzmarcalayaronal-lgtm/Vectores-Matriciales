@@ -71,6 +71,103 @@ class TestRBAC:
         assert r.status_code == 403
 
 
+class TestUsersDelete:
+    """Borrar un usuario limpia también su perfil de rastreo (FK en cascada)."""
+
+    def _create_user(self, client, admin_token, dni: str) -> str:
+        r = client.post(
+            f"{API}/companies/1/users",
+            headers=_auth(admin_token),
+            json={"name": f"Tmp {dni}", "dni": dni, "role": "operator", "password": "tmp12345"},
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    def _attach_worker(self, uid: str, dni: str) -> None:
+        from app.core.database import SessionLocal
+        from app.models import ConsentLog, Worker, WorkerLocation
+
+        db = SessionLocal()
+        try:
+            worker = Worker(
+                id=f"w{dni}", userId=uid, employeeCode=f"T{dni}",
+                position="", department="", isActive=True,
+            )
+            db.add(worker)
+            db.flush()
+            db.add(WorkerLocation(
+                id=f"l{dni}", workerId=worker.id,
+                latitude=-12.0, longitude=-77.0, isWithinGeofence=True,
+            ))
+            db.add(ConsentLog(
+                id=f"c{dni}", workerId=worker.id,
+                consentStatus="granted", consentVersion="v1",
+            ))
+            db.commit()
+        finally:
+            db.close()
+
+    def _leftovers(self, uid: str) -> tuple[int, int, int, int]:
+        from app.core.database import SessionLocal
+        from sqlalchemy import text
+
+        db = SessionLocal()
+        try:
+            w = db.execute(
+                text('SELECT count(*) FROM workers WHERE "userId" = :u'), {"u": uid}
+            ).scalar()
+            locs = db.execute(
+                text(
+                    'SELECT count(*) FROM worker_locations WHERE "workerId" '
+                    'IN (SELECT id FROM workers WHERE "userId" = :u)'
+                ),
+                {"u": uid},
+            ).scalar()
+            consents = db.execute(
+                text(
+                    'SELECT count(*) FROM consent_logs WHERE "workerId" '
+                    'IN (SELECT id FROM workers WHERE "userId" = :u)'
+                ),
+                {"u": uid},
+            ).scalar()
+            user = db.execute(
+                text("SELECT count(*) FROM users WHERE id = :u"), {"u": uid}
+            ).scalar()
+            return int(w or 0), int(locs or 0), int(consents or 0), int(user or 0)
+        finally:
+            db.close()
+
+    def test_delete_user_con_worker_y_registros(self, client, admin_token):
+        uid = self._create_user(client, admin_token, "99990001")
+        self._attach_worker(uid, "99990001")
+
+        r = client.delete(f"{API}/users/{uid}", headers=_auth(admin_token))
+        assert r.status_code == 200, r.text
+        assert r.json()["message"] == "Usuario eliminado"
+        assert self._leftovers(uid) == (0, 0, 0, 0)
+
+    def test_delete_user_sin_worker(self, client, admin_token):
+        uid = self._create_user(client, admin_token, "99990002")
+        r = client.delete(f"{API}/users/{uid}", headers=_auth(admin_token))
+        assert r.status_code == 200, r.text
+        assert self._leftovers(uid) == (0, 0, 0, 0)
+
+    def test_delete_self_400(self, client, admin_token):
+        from app.core.database import SessionLocal
+        from sqlalchemy import text
+
+        db = SessionLocal()
+        try:
+            admin_id = db.execute(
+                text("SELECT id FROM users WHERE dni = '12345678'")
+            ).scalar_one()
+        finally:
+            db.close()
+        r = client.delete(f"{API}/users/{admin_id}", headers=_auth(admin_token))
+        assert r.status_code == 400
+        assert "propia cuenta" in r.json()["message"]
+
+
 class TestOperationsAPI:
     def test_vector_add_completado(self, client, admin_token):
         r = client.post(

@@ -105,7 +105,10 @@ def login_with_face(
                 status_code=400,
                 detail="Este DNI no tiene un rostro registrado. Regístralo en Identidad Facial.",
             )
-        threshold = clamp_threshold(None, user.faceThreshold)
+        # El umbral configurable (slider de Identidad Facial) solo gobierna la
+        # verificación dentro de la sesión: registro y login usan siempre el
+        # corte fijo del servidor para no bloquear el acceso por un ajuste.
+        threshold = DEFAULT_THRESHOLD
         score = face_score(stored, probe)
         if not score_ok(score, threshold):
             record_audit(
@@ -141,7 +144,7 @@ def login_with_face(
             best, best_score = candidate, score
     if best is None:
         raise HTTPException(status_code=400, detail="No se pudo comparar contra ningún rostro registrado.")
-    threshold = clamp_threshold(None, best.faceThreshold)
+    threshold = DEFAULT_THRESHOLD
     if not score_ok(best_score, threshold):
         record_audit(
             db, best, action="login_face", module="identidad", status="failure",

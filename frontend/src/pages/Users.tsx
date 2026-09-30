@@ -26,6 +26,7 @@ export function Users() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const pageSize = 10;
 
@@ -90,9 +91,14 @@ export function Users() {
       try {
         await deleteUser.mutateAsync(deletingUser.id);
         setDeletingUser(null);
+        setDeleteError(null);
         refetch();
       } catch (error) {
-        console.error('Error deleting user:', error);
+        setDeleteError(
+          error instanceof Error && error.message
+            ? error.message
+            : 'No se pudo eliminar el usuario. Intenta de nuevo.'
+        );
       }
     }
   };
@@ -169,7 +175,7 @@ export function Users() {
                   <div className="flex items-center gap-1">
                     <button onClick={() => setViewingUser(row)} className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Ver"><Eye className="w-4 h-4" /></button>
                     <button onClick={() => openEditModal(row)} className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-gray-100" aria-label="Editar"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => setDeletingUser(row)} className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100" aria-label="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => { setDeleteError(null); setDeletingUser(row); }} className="p-2 rounded-lg text-secondary hover:text-danger hover:bg-gray-100" aria-label="Eliminar"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ),
               },
@@ -281,12 +287,17 @@ export function Users() {
 
       <Modal
         isOpen={!!deletingUser}
-        onClose={() => setDeletingUser(null)}
+        onClose={() => { setDeletingUser(null); setDeleteError(null); }}
         title="Eliminar Usuario"
         description={`¿Estás seguro de eliminar "${deletingUser?.name}"? Esta acción no se puede deshacer.`}
       >
+        {deleteError && (
+          <div className="mb-4 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
+            {deleteError}
+          </div>
+        )}
         <div className="flex justify-end gap-3 pt-4">
-          <Button variant="outline" onClick={() => setDeletingUser(null)}>
+          <Button variant="outline" onClick={() => { setDeletingUser(null); setDeleteError(null); }}>
             Cancelar
           </Button>
           <Button variant="danger" onClick={confirmDelete} loading={deleteUser.isPending}>

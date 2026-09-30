@@ -29,6 +29,8 @@ import {
   detectFace,
   drawFaceOverlay,
   embeddingFrom,
+  estimateGiro,
+  FRONTAL_GIRO_LIMIT,
   GEOM_POINTS,
   MAX_THRESHOLD,
   MIN_THRESHOLD,
@@ -336,27 +338,34 @@ export function Identity() {
         } else {
           const state = liveStateRef.current;
           const autoActive = !state.manual;
-          setScanMsg(
-            autoActive
-              ? `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · identificándote automáticamente…`
-              : `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · listo para capturar`,
-          );
-          if (autoActive && !autoBusyRef.current && Date.now() - autoLastRef.current >= 2500) {
-            autoLastRef.current = Date.now();
-            autoBusyRef.current = true;
-            void (async () => {
-              try {
-                const vector = await embeddingFrom(video);
-                if (!vector) return;
-                // Identificación 1:N: busca tu cuenta entre TODAS las plantillas del sistema
-                const response = await authApi.identifyFace({ vector, threshold: state.threshold });
-                setResult(response);
-              } catch {
-                // sin conexión o motor ocupado: se reintenta en el siguiente ciclo
-              } finally {
-                autoBusyRef.current = false;
-              }
-            })();
+          const frontal = Math.abs(estimateGiro(hit.landmarks)) <= FRONTAL_GIRO_LIMIT;
+          if (autoActive && !frontal) {
+            // Identificar con la cabeza girada da puntajes bajos falsos:
+            // se espera a un frame frontal antes de comparar.
+            setScanMsg('Mira de frente para identificarte: gira un poco la cabeza');
+          } else {
+            setScanMsg(
+              autoActive
+                ? `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · identificándote automáticamente…`
+                : `${hit.landmarks.length} puntos · ojos, nariz y boca detectados · listo para capturar`,
+            );
+            if (autoActive && !autoBusyRef.current && Date.now() - autoLastRef.current >= 2500) {
+              autoLastRef.current = Date.now();
+              autoBusyRef.current = true;
+              void (async () => {
+                try {
+                  const vector = await embeddingFrom(video);
+                  if (!vector) return;
+                  // Identificación 1:N: busca tu cuenta entre TODAS las plantillas del sistema
+                  const response = await authApi.identifyFace({ vector, threshold: state.threshold });
+                  setResult(response);
+                } catch {
+                  // sin conexión o motor ocupado: se reintenta en el siguiente ciclo
+                } finally {
+                  autoBusyRef.current = false;
+                }
+              })();
+            }
           }
         }
       })();

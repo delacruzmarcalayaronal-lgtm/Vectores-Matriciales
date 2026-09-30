@@ -240,6 +240,9 @@ const NOSE_LINE = [168, 6, 197, 195, 5, 4, 1];
 const NOSE_BASE = [64, 48, 1, 305, 438];
 const MOUTH_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
 const MOUTH_INNER = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
+/* Los labios se dibujan en un solo color (cian HUD) y SIN puntos del mesh de
+   profundidad encima: los índices se excluyen del campo de puntos. */
+const LIP_INDEXES: Set<number> = new Set([...MOUTH_OUTER, ...MOUTH_INNER]);
 const LEFT_IRIS = [468, 469, 470, 471, 472];
 const RIGHT_IRIS = [473, 474, 475, 476, 477];
 /* Cejas (recorrido cerrado: borde inferior externo→interno y superior
@@ -312,7 +315,8 @@ export function estimateGiro(landmarks: FacePoint[]): number {
 }
 
 /* Paleta de profundidad del overlay: lo lejano en cian, la superficie en
-   verde y el relieve (frente, mentón, labios) en ámbar/naranja. */
+   verde y el relieve (frente, mentón) en ámbar/naranja. Los labios quedan
+   fuera de este mapa: se pintan con un color fijo (cian HUD). */
 const DEPTH_STOPS: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
   [0, [6, 182, 212]],
   [0.4, [34, 197, 94]],
@@ -389,7 +393,9 @@ export function drawFaceOverlay(
   const baseRadius = Math.max(0.5, Math.min(1.4, faceW * 0.005));
   ctx.save();
   ctx.globalAlpha = 0.92;
-  for (const point of landmarks) {
+  for (let i = 0; i < landmarks.length; i += 1) {
+    if (LIP_INDEXES.has(i)) continue;
+    const point = landmarks[i];
     const t = (zMax - point.z) / zSpan;
     ctx.fillStyle = depthColor(t);
     ctx.beginPath();
@@ -415,19 +421,19 @@ export function drawFaceOverlay(
   }
   ctx.restore();
 
-  // Boca: relleno naranja translúcido + contorno
+  // Boca: un solo color (cian HUD) - relleno translúcido + contorno e interior
   ctx.save();
-  ctx.fillStyle = 'rgba(255, 152, 0, 0.38)';
+  ctx.fillStyle = 'rgba(6, 182, 212, 0.42)';
   fillPath(ctx, landmarks, MOUTH_OUTER, px, py);
-  ctx.strokeStyle = '#FF9800';
+  ctx.strokeStyle = '#06B6D4';
   ctx.lineWidth = Math.max(1.4, Math.min(3, faceW * 0.009));
   ctx.lineJoin = 'round';
   if (stable) {
-    ctx.shadowColor = '#FF9800';
+    ctx.shadowColor = '#06B6D4';
     ctx.shadowBlur = glow;
   }
   strokePath(ctx, landmarks, MOUTH_OUTER, px, py);
-  ctx.strokeStyle = '#FFB74D';
+  ctx.strokeStyle = '#06B6D4';
   ctx.lineWidth = Math.max(1, Math.min(2, faceW * 0.006));
   strokePath(ctx, landmarks, MOUTH_INNER, px, py);
   ctx.restore();

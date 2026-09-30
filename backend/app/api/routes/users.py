@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ...core.deps import ensure_company, get_current_user, require_roles
 from ...core.security import hash_password
 from ...core.database import get_db
-from ...models import User
+from ...models import ConsentLog, User, Worker, WorkerLocation
 from ...schemas import UserCreate, UserOut, UserUpdate
 from ...services.audit import record_audit
 from ..helpers import apply_changes, get_or_404, new_id
@@ -117,6 +117,14 @@ def delete_user(
     ensure_company(user, target.companyId)
     if target.id == user.id:
         raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta")
+    # El perfil de rastreo (y sus registros GPS/consentimientos) dependen del
+    # usuario por FK: sin borrarlos primero la restricción revienta con 500 y
+    # el borrado "no hace nada" en la interfaz.
+    worker_ids = list(db.scalars(select(Worker.id).where(Worker.userId == target.id)))
+    if worker_ids:
+        db.execute(delete(WorkerLocation).where(WorkerLocation.workerId.in_(worker_ids)))
+        db.execute(delete(ConsentLog).where(ConsentLog.workerId.in_(worker_ids)))
+        db.execute(delete(Worker).where(Worker.id.in_(worker_ids)))
     record_audit(
         db, user, action="delete", module="usuarios",
         entity_type="user", entity_id=target.id,

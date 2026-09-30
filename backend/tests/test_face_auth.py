@@ -86,6 +86,34 @@ def test_login_face_match_and_mismatch(client):
     assert "no coincide" in r2.json()["message"]
 
 
+def test_login_face_ignores_saved_threshold(client, admin_token):
+    """El umbral guardado (slider de Identidad Facial) NO bloquea el acceso.
+
+    test_save_face_template dejó la plantilla del admin con umbral 85; un rostro
+    con confianza ~71% debe poder entrar porque el login usa siempre el corte
+    fijo del servidor (DEFAULT_THRESHOLD=60). En Identidad el umbral guardado
+    sigue gobernando la verificación.
+    """
+    from app.services.face import face_score
+
+    mid = [round(a + b, 5) for a, b in zip(ADMIN_VECTOR, OTHER_VECTOR)]
+    score = face_score(ADMIN_VECTOR, mid)
+    assert 0.60 < score < 0.85, f"el vector intermedio debe caer entre 60 y 85 (score={score:.3f})"
+
+    r = client.post(f"{API}/auth/login/face", json={"dni": "12345678", "faceVector": mid})
+    assert r.status_code == 200, "el login facial ignora el umbral guardado del usuario"
+    assert r.json()["user"]["dni"] == "12345678"
+
+    v = client.post(
+        f"{API}/auth/face/verify",
+        headers=_auth(admin_token),
+        json={"vector": mid},
+    )
+    assert v.status_code == 200
+    assert v.json()["threshold"] == 85, "en Identidad el umbral guardado sigue activo"
+    assert v.json()["ok"] is False
+
+
 def test_login_face_without_template(client):
     r = client.post(f"{API}/auth/login/face", json={"dni": "22222222", "faceVector": ADMIN_VECTOR})
     assert r.status_code == 400

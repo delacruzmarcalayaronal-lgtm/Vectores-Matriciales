@@ -126,7 +126,12 @@ export function Login() {
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const base = err instanceof Error ? err.message : 'No se pudo completar la operación';
-      if (mode === 'login') {
+      // Errores de ESTADO de registro (plantilla en versión anterior, sin
+      // rostro, escaneo demo): no son credenciales inválidas, así que no se
+      // cuentan como intento fallido ni desencadenan el bloqueo de 5 min.
+      const isRegistrationState =
+        base.includes('Identidad Facial') || base.includes('Escanea tu rostro');
+      if (mode === 'login' && !isRegistrationState) {
         const maxAttempts = readSecurity().maxLoginAttempts;
         const attempts = registerFailedLogin(maxAttempts);
         if (attempts.until > Date.now()) {
@@ -142,6 +147,14 @@ export function Login() {
       setIsLoading(false);
     }
   };
+
+  // Aviso accionable cuando el rostro necesita re-registro: el usuario está
+  // en el método "con mi rostro" y la salida real es entrar con DNI primero.
+  const needsReregister =
+    mode === 'login' &&
+    method === 'face' &&
+    !!error &&
+    (error.includes('Identidad Facial') || error.includes('Escanea tu rostro'));
 
   return (
     <div className="min-h-screen bg-bg relative overflow-hidden flex">
@@ -237,6 +250,16 @@ export function Login() {
                 <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2 text-danger text-sm">
                   <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <span>{error}</span>
+                </div>
+              )}
+
+              {needsReregister && (
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-text text-sm flex items-start gap-2">
+                  <ShieldCheck className="w-5 h-5 flex-shrink-0 mt-0.5 text-primary" />
+                  <span>
+                    Solución: entra con <strong>tu DNI</strong> y vuelve a escanear tu rostro en{' '}
+                    <strong>Identidad Facial</strong> para registrarlo con la versión nueva.
+                  </span>
                 </div>
               )}
 

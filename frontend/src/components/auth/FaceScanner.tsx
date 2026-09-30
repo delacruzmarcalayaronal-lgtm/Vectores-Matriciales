@@ -15,7 +15,7 @@ interface FaceScannerProps {
   onReset?: () => void;
 }
 
-const STABLE_REQUIRED = 8;
+const STABLE_REQUIRED = 6;
 const SCAN_TIMEOUT_MS = 40000;
 
 export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScannerProps) {
@@ -30,6 +30,7 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
   const startedRef = useRef(0);
   const busyRef = useRef(false);
   const embedBusyRef = useRef(false);
+  const tickBusyRef = useRef(false);
   const framesRef = useRef(0);
   const samplesRef = useRef<number[][]>([]);
 
@@ -104,108 +105,123 @@ export function FaceScanner({ disabled = false, onVerified, onReset }: FaceScann
     const video = videoRef.current;
     if (!video) return;
     timerRef.current = window.setInterval(() => {
+      // Un tick por vez: si la inferencia/la captura aún no terminó, no se
+      // apilan detecciones encima (el progreso y el promedio se descontrolan).
+      if (tickBusyRef.current) return;
+      tickBusyRef.current = true;
       void (async () => {
-        const current = videoRef.current;
-        if (!current || current.readyState < 2) return;
-        let hit: FaceHit | null = null;
         try {
-          hit = await detectFace(current);
-        } catch {
-          setStatus('error');
-          setHint('No se pudo cargar el motor de reconocimiento. Usa el modo demostración.');
-          setShowDemo(true);
-          stopCamera();
-          if (timerRef.current) {
-            window.clearInterval(timerRef.current);
-            timerRef.current = null;
+          const current = videoRef.current;
+          if (!current || current.readyState < 2) return;
+          let hit: FaceHit | null = null;
+          try {
+            hit = await detectFace(current);
+          } catch {
+            setStatus('error');
+            setHint('No se pudo cargar el motor de reconocimiento. Usa el modo demostración.');
+            setShowDemo(true);
+            stopCamera();
+            if (timerRef.current) {
+              window.clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            return;
           }
-          return;
-        }
-        hitRef.current = hit;
-        if (hit) {
-          framesRef.current += 1;
-          setHud({ points: hit.landmarks.length, frames: framesRef.current, giro: estimateGiro(hit.landmarks) });
-        } else {
-          setHud(prev => ({ points: 0, frames: prev.frames, giro: 0 }));
-        }
-        let smoothBox: FaceHit['box'] | undefined;
-        if (hit) {
-          const prev = smoothBoxRef.current;
-          smoothBox = prev
-            ? {
-                x: prev.x + (hit.box.x - prev.x) * 0.5,
-                y: prev.y + (hit.box.y - prev.y) * 0.5,
-                width: prev.width + (hit.box.width - prev.width) * 0.5,
-                height: prev.height + (hit.box.height - prev.height) * 0.5,
-              }
-            : hit.box;
-          smoothBoxRef.current = smoothBox;
-        } else {
-          smoothBoxRef.current = null;
-        }
-        const overlay = overlayRef.current;
-        if (overlay) {
-          const rect = overlay.getBoundingClientRect();
-          const cssW = Math.max(1, Math.round(rect.width));
-          const cssH = Math.max(1, Math.round(rect.height));
-          const dpr = Math.min(2, window.devicePixelRatio || 1);
-          const backingW = Math.max(1, Math.round(cssW * dpr));
-          const backingH = Math.max(1, Math.round(cssH * dpr));
-          if (overlay.width !== backingW || overlay.height !== backingH) {
-            overlay.width = backingW;
-            overlay.height = backingH;
+          hitRef.current = hit;
+          if (hit) {
+            framesRef.current += 1;
+            setHud({ points: hit.landmarks.length, frames: framesRef.current, giro: estimateGiro(hit.landmarks) });
+          } else {
+            setHud(prev => ({ points: 0, frames: prev.frames, giro: 0 }));
           }
-          drawFaceOverlay(overlay, hit, {
-            stable: stableRef.current >= STABLE_REQUIRED,
-            smoothBox,
-            video: { width: current.videoWidth, height: current.videoHeight },
-            cssWidth: cssW,
-            cssHeight: cssH,
-          });
-        }
-        if (!hit) {
-          stableRef.current = Math.max(0, stableRef.current - 1);
-          setHint('Buscando el rostro… coloca tu rostro frente a la cámara');
-          setProgress((stableRef.current / STABLE_REQUIRED) * 100);
-          return;
-        }
-        const box = hit.box;
-        const cx = box.x + box.width / 2;
-        const cy = box.y + box.height / 2;
-        const wellFramed =
-          box.width >= 0.12 && box.width <= 0.95 && Math.abs(cx - 0.5) < 0.28 && Math.abs(cy - 0.5) < 0.28;
-        if (wellFramed) {
-          stableRef.current += 1;
-          if (!embedBusyRef.current) {
-            embedBusyRef.current = true;
-            void embeddingFrom(current)
-              .then(sample => {
-                if (sample) {
-                  samplesRef.current.push(sample);
-                  if (samplesRef.current.length > 12) samplesRef.current.shift();
+          let smoothBox: FaceHit['box'] | undefined;
+          if (hit) {
+            const prev = smoothBoxRef.current;
+            smoothBox = prev
+              ? {
+                  x: prev.x + (hit.box.x - prev.x) * 0.5,
+                  y: prev.y + (hit.box.y - prev.y) * 0.5,
+                  width: prev.width + (hit.box.width - prev.width) * 0.5,
+                  height: prev.height + (hit.box.height - prev.height) * 0.5,
                 }
-              })
-              .catch(() => {
-                // frame descartado: el promedio sigue con los demás
-              })
-              .finally(() => {
-                embedBusyRef.current = false;
-              });
+              : hit.box;
+            smoothBoxRef.current = smoothBox;
+          } else {
+            smoothBoxRef.current = null;
           }
-        } else {
-          stableRef.current = Math.max(0, stableRef.current - 1);
-          setHint(box.width < 0.12 ? 'Acércate un poco a la cámara' : 'Centra tu rostro frente a la cámara');
-        }
-        setProgress((stableRef.current / STABLE_REQUIRED) * 100);
-        if (stableRef.current >= STABLE_REQUIRED) {
-          if (timerRef.current) {
-            window.clearInterval(timerRef.current);
-            timerRef.current = null;
+          const overlay = overlayRef.current;
+          if (overlay) {
+            const rect = overlay.getBoundingClientRect();
+            const cssW = Math.max(1, Math.round(rect.width));
+            const cssH = Math.max(1, Math.round(rect.height));
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            const backingW = Math.max(1, Math.round(cssW * dpr));
+            const backingH = Math.max(1, Math.round(cssH * dpr));
+            if (overlay.width !== backingW || overlay.height !== backingH) {
+              overlay.width = backingW;
+              overlay.height = backingH;
+            }
+            drawFaceOverlay(overlay, hit, {
+              stable: stableRef.current >= STABLE_REQUIRED,
+              smoothBox,
+              video: { width: current.videoWidth, height: current.videoHeight },
+              cssWidth: cssW,
+              cssHeight: cssH,
+            });
           }
-          await finish(hit, current);
-        } else if (Date.now() - startedRef.current > SCAN_TIMEOUT_MS) {
-          setShowDemo(true);
-          setHint('Todavía no se detecta un rostro nítido: mejora la iluminación o usa el modo demostración');
+          if (!hit) {
+            stableRef.current = Math.max(0, stableRef.current - 1);
+            setHint('Buscando el rostro… coloca tu rostro frente a la cámara');
+            setProgress((stableRef.current / STABLE_REQUIRED) * 100);
+            return;
+          }
+          const box = hit.box;
+          const cx = box.x + box.width / 2;
+          const cy = box.y + box.height / 2;
+          const wellFramed =
+            box.width >= 0.1 && box.width <= 0.95 && Math.abs(cx - 0.5) < 0.3 && Math.abs(cy - 0.5) < 0.3;
+          const giro = estimateGiro(hit.landmarks);
+          const frontal = Math.abs(giro) <= FRONTAL_GIRO_LIMIT;
+          if (wellFramed && frontal) {
+            stableRef.current += 1;
+            if (!embedBusyRef.current) {
+              embedBusyRef.current = true;
+              void embeddingFrom(current)
+                .then(sample => {
+                  if (sample) {
+                    samplesRef.current.push(sample);
+                    if (samplesRef.current.length > 12) samplesRef.current.shift();
+                  }
+                })
+                .catch(() => {
+                  // frame descartado: el promedio sigue con los demás
+                })
+                .finally(() => {
+                  embedBusyRef.current = false;
+                });
+            }
+          } else if (wellFramed) {
+            // Encuadre bien pero de lado: se sostiene el progreso sin restar
+            // ni sumar, solo pidiendo mirar de frente (la captura frontal es
+            // la que puntúa alto al comparar).
+            setHint('Mira de frente: gira un poco la cabeza hasta que el escáner complete');
+          } else {
+            stableRef.current = Math.max(0, stableRef.current - 1);
+            setHint(box.width < 0.1 ? 'Acércate un poco a la cámara' : 'Centra tu rostro frente a la cámara');
+          }
+          setProgress((stableRef.current / STABLE_REQUIRED) * 100);
+          if (stableRef.current >= STABLE_REQUIRED) {
+            if (timerRef.current) {
+              window.clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            await finish(hit, current);
+          } else if (Date.now() - startedRef.current > SCAN_TIMEOUT_MS) {
+            setShowDemo(true);
+            setHint('Todavía no se detecta un rostro nítido: mejora la iluminación o usa el modo demostración');
+          }
+        } finally {
+          tickBusyRef.current = false;
         }
       })();
     }, 280);
