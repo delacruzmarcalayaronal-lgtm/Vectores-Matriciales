@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, ReactNode } from 'react';
+﻿import { useState, useEffect, useRef, ReactNode } from 'react';
 import axios from 'axios';
 import type { User, AuthResponse } from '../types';
 import { authApi, clearTokens, setTokens } from '../services/api';
@@ -38,17 +38,26 @@ const toMessage = (error: unknown, fallback: string) => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(() => Boolean(localStorage.getItem('accessToken')));
+  // Generación de sesión: invalida respuestas async (refreshUser) que llegan
+  // después de un logout o de un login nuevo; sin esto, un me() viejo podía
+  // revivir user con los tokens ya borrados y los <Navigate> de Login y del
+  // guard entraban en bucle /dashboard ⇄ /login ("Maximum update depth").
+  const sessionGen = useRef(0);
 
   const applySession = (data: AuthResponse) => {
+    sessionGen.current += 1;
     setTokens(data.accessToken, data.refreshToken);
     setUser(applyProfile(data.user));
   };
 
   const refreshUser = async () => {
+    const gen = sessionGen.current;
     try {
       const meUser = USE_MOCK ? await mockAuth.me() : await authApi.me();
+      if (gen !== sessionGen.current) return;
       setUser(applyProfile(meUser));
     } catch {
+      if (gen !== sessionGen.current) return;
       setUser(null);
       clearTokens();
     } finally {
@@ -95,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (Date.now() - lastActivity >= security.sessionMinutes * 60000) {
         window.clearInterval(timer);
         if (!USE_MOCK) void authApi.logout().catch(() => undefined);
+        sessionGen.current += 1;
         clearTokens();
         setUser(null);
         window.location.href = '/login?motivo=inactividad';
@@ -147,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     clearConsent();
     notifyConsentChanged();
+    sessionGen.current += 1;
     clearTokens();
     setUser(null);
   };
@@ -177,7 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // almacenamiento lleno: el cambio ya quedó guardado en el servidor
     }
-    setUser(prev => (prev ? { ...prev, ...updated } : updated));
+    // si la sesión se cerró mientras guardaba, no revivir user (prev sigue null)
+    setUser(prev => (prev ? { ...prev, ...updated } : prev));
   };
 
   const canModule = (module: ModuleKey) => can(user?.role, module);

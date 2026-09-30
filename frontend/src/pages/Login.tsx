@@ -59,7 +59,10 @@ export function Login() {
   const faceVectorOk = mode === 'register' || method !== 'face' || !!faceScan?.vector;
   const canSubmit = dniOk && nameValid && faceOk && faceVectorOk && !isLoading;
 
-  if (!authLoading && isAuthenticated) {
+  // La condición usa las MISMAS fuentes que ProtectedRoute (usuario + token):
+  // con user ≠ null y token = null (carrera entre refreshUser y logout) ambas
+  // mitades divergían y los <Navigate> entraban en bucle /dashboard ⇄ /login.
+  if (!authLoading && isAuthenticated && localStorage.getItem('accessToken')) {
     return <Navigate to="/dashboard" replace />;
   }
 
