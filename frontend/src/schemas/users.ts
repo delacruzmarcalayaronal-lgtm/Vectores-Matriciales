@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const roleEnum = z.enum(['admin', 'manager', 'analyst', 'operator'], {
+const roleEnum = z.enum(['admin', 'manager', 'analyst', 'operator', 'consulta'], {
   errorMap: () => ({ message: 'Rol inválido' }),
 });
 

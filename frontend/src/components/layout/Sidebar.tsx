@@ -68,6 +68,7 @@ const ROLE_LABELS: Record<string, string> = {
   manager: 'Gerente',
   analyst: 'Analista',
   operator: 'Operador',
+  consulta: 'Consulta',
 };
 
 export function Sidebar({ isOpen, onNavigate, onExpandedChange }: SidebarProps) {

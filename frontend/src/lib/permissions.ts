@@ -42,6 +42,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   manager: 'Gerente de Operaciones',
   analyst: 'Analista de Datos',
   operator: 'Operario de Caja',
+  consulta: 'Consulta',
 };
 
 export const ROLE_ICONS: Record<Role, string> = {
@@ -49,6 +50,7 @@ export const ROLE_ICONS: Record<Role, string> = {
   manager: '💼',
   analyst: '🔬',
   operator: '🛒',
+  consulta: '👁️',
 };
 
 export const ROLE_MODULES: Record<Role, ModuleKey[]> = {
@@ -56,6 +58,7 @@ export const ROLE_MODULES: Record<Role, ModuleKey[]> = {
   manager: ['dashboard', 'empresa', 'sucursales', 'productos', 'ventas', 'inventario', 'reportes', 'identidad', 'geografia', 'configuracion'],
   analyst: ['dashboard', 'vectores', 'matrices', 'operaciones', 'combinaciones', 'historial', 'identidad', 'configuracion'],
   operator: ['dashboard', 'ventas', 'inventario', 'identidad', 'configuracion'],
+  consulta: ['dashboard', 'reportes'],
 };
 
 export function can(role: Role | undefined | null, module: ModuleKey): boolean {

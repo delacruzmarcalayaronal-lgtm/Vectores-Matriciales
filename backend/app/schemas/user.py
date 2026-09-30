@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-Role = Literal["admin", "manager", "analyst", "operator"]
+Role = Literal["admin", "manager", "analyst", "operator", "consulta"]
 
 
 class UserOut(BaseModel):

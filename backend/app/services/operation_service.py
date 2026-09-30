@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from ..algorithms import run_operation
-from ..models import Matrix, Operation, User, Vector
+from ..models import Matrix, Operation, OperationInput, OperationResult, User, Vector
 from ..api.helpers import get_or_404, new_id
 from ..repositories.operation_repository import OperationRepository
 from ..schemas import OperationExecuteIn, OperationOut, Page
@@ -27,19 +27,24 @@ class OperationService:
     def execute(
         self, company_id: str, body: OperationExecuteIn, user: User
     ) -> Operation:
+        input_entries: list[tuple[str, str, str, list]] = []
         vector_values: list[list[float]] = []
         for vector_id in body.inputVectorIds:
             vector = get_or_404(self.db, Vector, vector_id, "Vector")
             if vector.companyId != company_id:
                 raise HTTPException(status_code=400, detail="Vector no autorizado")
-            vector_values.append(list(vector.values))
+            snapshot = list(vector.values)
+            vector_values.append(snapshot)
+            input_entries.append(("vector", vector_id, vector.name, snapshot))
 
         matrix_values: list[list[list[float]]] = []
         for matrix_id in body.inputMatrixIds:
             matrix = get_or_404(self.db, Matrix, matrix_id, "Matriz")
             if matrix.companyId != company_id:
                 raise HTTPException(status_code=400, detail="Matriz no autorizada")
-            matrix_values.append([list(row) for row in matrix.values])
+            snapshot = [list(row) for row in matrix.values]
+            matrix_values.append(snapshot)
+            input_entries.append(("matrix", matrix_id, matrix.name, snapshot))
 
         parameters = dict(body.parameters or {})
         parameters["vectorIds"] = list(body.inputVectorIds)
@@ -57,6 +62,18 @@ class OperationService:
             parameters=parameters,
             status="pending",
         )
+        for position, (kind, ref_id, label, snapshot) in enumerate(input_entries):
+            operation.inputRows.append(
+                OperationInput(
+                    id=new_id(),
+                    operationId=operation.id,
+                    position=position,
+                    kind=kind,
+                    refId=ref_id,
+                    label=label,
+                    values=snapshot,
+                )
+            )
 
         start = perf_counter()
         try:
@@ -84,6 +101,15 @@ class OperationService:
             self.db.add(vector)
             self.db.flush()
             operation.resultVectorId = vector.id
+            operation.resultRows.append(
+                OperationResult(
+                    id=new_id(),
+                    operationId=operation.id,
+                    kind="vector",
+                    refId=vector.id,
+                    values=value,
+                )
+            )
         elif result["kind"] == "matrix":
             value = [[float(x) for x in row] for row in result["value"]]
             rows, cols = len(value), len(value[0])
@@ -102,8 +128,26 @@ class OperationService:
             self.db.add(matrix)
             self.db.flush()
             operation.resultMatrixId = matrix.id
+            operation.resultRows.append(
+                OperationResult(
+                    id=new_id(),
+                    operationId=operation.id,
+                    kind="matrix",
+                    refId=matrix.id,
+                    values=value,
+                )
+            )
         else:
             operation.parameters = {**parameters, "result": float(result["value"])}
+            operation.resultRows.append(
+                OperationResult(
+                    id=new_id(),
+                    operationId=operation.id,
+                    kind="scalar",
+                    refId=None,
+                    values=[float(result["value"])],
+                )
+            )
 
         operation.status = "completed"
         operation.executionTimeMs = max(1, int(round((perf_counter() - start) * 1000)))

@@ -39,11 +39,12 @@ def _run_migrations() -> None:
 
 def init_db() -> None:
     from .. import models  # noqa: F401
-    from ..seed import seed_if_empty
+    from ..seed import seed_if_empty, sync_plan
 
     _run_migrations()
     db = SessionLocal()
     try:
         seed_if_empty(db)
+        sync_plan(db)
     finally:
         db.close()

@@ -376,6 +376,9 @@ def seed_demo(db: Session) -> bool:
         )
     )
     db.commit()
+    from .seed import sync_plan
+
+    sync_plan(db)
     return True
 
 

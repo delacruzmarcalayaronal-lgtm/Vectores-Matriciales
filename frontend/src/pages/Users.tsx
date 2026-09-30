@@ -16,6 +16,7 @@ const ROLE_BADGES: Record<User['role'], 'primary' | 'warning' | 'info' | 'succes
   manager: 'warning',
   analyst: 'info',
   operator: 'success',
+  consulta: 'info',
 };
 
 export function Users() {
@@ -128,6 +129,7 @@ export function Users() {
                 { value: 'manager', label: ROLE_LABELS.manager },
                 { value: 'analyst', label: ROLE_LABELS.analyst },
                 { value: 'operator', label: ROLE_LABELS.operator },
+                { value: 'consulta', label: ROLE_LABELS.consulta },
               ]}
               className="w-full sm:w-56"
             />
@@ -215,6 +217,7 @@ export function Users() {
                 { value: 'manager', label: ROLE_LABELS.manager },
                 { value: 'analyst', label: ROLE_LABELS.analyst },
                 { value: 'operator', label: ROLE_LABELS.operator },
+                { value: 'consulta', label: ROLE_LABELS.consulta },
               ]}
               error={errors.role?.message}
             />
