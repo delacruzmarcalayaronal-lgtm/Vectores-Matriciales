@@ -58,6 +58,7 @@ const THEME_CARDS: Record<ThemeMode, { label: string; bg: string; surface: strin
   navy: { label: 'Azul Marino', bg: '#060B16', surface: '#132240', text: '#E3ECFA', border: '#1B2A47' },
   graphite: { label: 'Carbón', bg: '#0C0D0F', surface: '#1A1D21', text: '#E8EAED', border: '#26292E' },
   cosmos: { label: 'Cosmos', bg: '#08040F', surface: '#1E1236', text: '#EDE9FE', border: '#2C2050' },
+  'mejor-grupo': { label: 'El Mejor Grupo', bg: '#0A0406', surface: '#190A0E', text: '#F5E7EA', border: '#3B1219' },
 };
 
 export function Settings() {

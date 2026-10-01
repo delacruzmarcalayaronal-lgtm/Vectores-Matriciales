@@ -220,6 +220,39 @@ html.dark.theme-cosmos {
   --sidebar-gradient: linear-gradient(180deg, #070310 0%, #170D2E 100%);
 }
 
+/* ===== El Mejor Grupo: negro con rojo y el icono de fondo ===== */
+html.dark.theme-mejor-grupo {
+  --color-bg: #0A0406;
+  --color-text: #F5E7EA;
+  --color-secondary: #B79AA1;
+  --color-border: #3B1219;
+  --color-sidebar: #0B0305;
+  --color-accent: #F87171;
+  --surface-1: #190A0E;
+  --surface-2: #14080B;
+  --surface-3: #100608;
+  --surface-4: #0C0406;
+  --surface-hover: #2B1116;
+  --sidebar-gradient: linear-gradient(180deg, #0B0305 0%, #33080F 100%);
+  color-scheme: dark;
+}
+
+html.dark.theme-mejor-grupo .min-h-screen.bg-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(6, 2, 3, 0.84), rgba(6, 2, 3, 0.9)),
+    radial-gradient(circle at 50% 32%, rgba(185, 28, 28, 0.42), rgba(6, 2, 3, 0) 62%),
+    url('/icono.jpeg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 @media print {
   @page {
     margin: 0;

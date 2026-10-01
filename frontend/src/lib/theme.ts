@@ -8,7 +8,8 @@ export type ThemeMode =
   | 'noir'
   | 'navy'
   | 'graphite'
-  | 'cosmos';
+  | 'cosmos'
+  | 'mejor-grupo';
 
 const THEME_KEY = 'mf_theme';
 export const DEFAULT_PRIMARY = '#2563EB';
@@ -21,6 +22,7 @@ const PRESET_DARK_CLASSES = [
   'theme-navy',
   'theme-graphite',
   'theme-cosmos',
+  'theme-mejor-grupo',
 ];
 
 export const THEME_OPTIONS: ThemeMode[] = [
@@ -34,6 +36,7 @@ export const THEME_OPTIONS: ThemeMode[] = [
   'navy',
   'graphite',
   'cosmos',
+  'mejor-grupo',
 ];
 
 /** El color de acento lo define el tema (ya no hay selector independiente).
@@ -51,6 +54,7 @@ export const THEME_ACCENTS: Record<ThemeMode, string> = {
   navy: '#1D4ED8',
   graphite: '#3F3F46',
   cosmos: '#6D28D9',
+  'mejor-grupo': '#B91C1C',
 };
 
 export function accentForTheme(mode: ThemeMode): string {
