@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/useAuth';
 import { Layout } from './components/layout/Layout';
 import { LocationConsentModal } from './components/LocationConsentModal';
+import { ReferenceOverlay } from './components/ReferenceOverlay';
 import { resolveModule, firstAllowedPath } from './lib/permissions';
 import { hasConsent, LOCATION_CONSENT_EVENT } from './lib/locationConsent';
 import { Login } from './pages/Login';
@@ -94,6 +95,7 @@ function AppRoutes() {
   return (
     <>
       <LocationConsentGate />
+      <ReferenceOverlay />
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
