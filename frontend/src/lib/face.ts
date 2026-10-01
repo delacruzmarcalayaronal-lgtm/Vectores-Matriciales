@@ -238,66 +238,12 @@ const LEFT_EYE = [246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 14
 const RIGHT_EYE = [466, 388, 387, 386, 385, 384, 398, 382, 381, 380, 374, 373, 390, 249, 263, 362];
 const NOSE_LINE = [168, 6, 197, 195, 5, 4, 1];
 const NOSE_BASE = [64, 48, 1, 305, 438];
-const MOUTH_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
-const MOUTH_INNER = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
-/* Los labios se dibujan en un solo color (cian HUD) y SIN puntos del mesh de
-   profundidad encima: los índices se excluyen del campo de puntos. */
-const LIP_INDEXES: Set<number> = new Set([...MOUTH_OUTER, ...MOUTH_INNER]);
 const LEFT_IRIS = [468, 469, 470, 471, 472];
 const RIGHT_IRIS = [473, 474, 475, 476, 477];
 /* Cejas (recorrido cerrado: borde inferior externo→interno y superior
    interno→externo; índices verificados con un frame real del mesh). */
 const LEFT_BROW = [46, 53, 52, 65, 55, 107, 66, 105, 63, 70];
 const RIGHT_BROW = [276, 283, 282, 295, 285, 336, 296, 334, 293, 300];
-
-function strokePath(
-  ctx: CanvasRenderingContext2D,
-  landmarks: FacePoint[],
-  indices: number[],
-  px: (value: number) => number,
-  py: (value: number) => number,
-): boolean {
-  let drew = false;
-  ctx.beginPath();
-  for (const index of indices) {
-    const point = landmarks[index];
-    if (!point) continue;
-    if (!drew) {
-      ctx.moveTo(px(point.x), py(point.y));
-      drew = true;
-    } else {
-      ctx.lineTo(px(point.x), py(point.y));
-    }
-  }
-  if (drew) ctx.stroke();
-  return drew;
-}
-
-function fillPath(
-  ctx: CanvasRenderingContext2D,
-  landmarks: FacePoint[],
-  indices: number[],
-  px: (value: number) => number,
-  py: (value: number) => number,
-): boolean {
-  let drew = false;
-  ctx.beginPath();
-  for (const index of indices) {
-    const point = landmarks[index];
-    if (!point) continue;
-    if (!drew) {
-      ctx.moveTo(px(point.x), py(point.y));
-      drew = true;
-    } else {
-      ctx.lineTo(px(point.x), py(point.y));
-    }
-  }
-  if (drew) {
-    ctx.closePath();
-    ctx.fill();
-  }
-  return drew;
-}
 
 /* Rotación de cabeza (yaw) aproximada: desplazamiento horizontal de la punta
    de la nariz respecto al centro de los ojos, normalizado por la distancia
@@ -314,32 +260,11 @@ export function estimateGiro(landmarks: FacePoint[]): number {
   return (nose.x - (left.x + right.x) / 2) / dist;
 }
 
-/* Paleta de profundidad del overlay: lo lejano en cian, la superficie en
-   verde y el relieve (frente, mentón) en ámbar/naranja. Los labios quedan
-   fuera de este mapa: se pintan con un color fijo (cian HUD). */
-const DEPTH_STOPS: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
-  [0, [6, 182, 212]],
-  [0.4, [34, 197, 94]],
-  [0.7, [250, 204, 21]],
-  [1, [249, 115, 22]],
-];
-
-function depthColor(t: number): string {
-  const stops = DEPTH_STOPS;
-  let from = stops[0];
-  let to = stops[stops.length - 1];
-  for (let i = 0; i < stops.length - 1; i += 1) {
-    if (t >= stops[i][0] && t <= stops[i + 1][0]) {
-      from = stops[i];
-      to = stops[i + 1];
-      break;
-    }
-  }
-  const span = to[0] - from[0] || 1;
-  const k = Math.max(0, Math.min(1, (t - from[0]) / span));
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * k);
-  return `rgb(${mix(from[1][0], to[1][0])}, ${mix(from[1][1], to[1][1])}, ${mix(from[1][2], to[1][2])})`;
-}
+/* Paleta del overlay: un solo color para TODOS los puntos del mesh (malla,
+   nariz, ojos, cejas y labios incluidos) más un recuadro de detección estilo
+   OpenCV/MediaPipe alrededor del rostro. */
+const MESH_COLOR = '#22D3EE';
+const BOX_COLOR = '#22C55E';
 
 export function drawFaceOverlay(
   canvas: HTMLCanvasElement,
@@ -382,7 +307,7 @@ export function drawFaceOverlay(
   const stable = !!options.stable;
   const glow = stable ? Math.max(4, faceW * 0.05) : 0;
 
-  // Campo de puntos del mesh coloreado por profundidad (478 puntos, diminutos)
+  // Campo de puntos del mesh: un solo color, labios incluidos (478 puntos)
   let zMin = Infinity;
   let zMax = -Infinity;
   for (const point of landmarks) {
@@ -393,22 +318,25 @@ export function drawFaceOverlay(
   const baseRadius = Math.max(0.5, Math.min(1.4, faceW * 0.005));
   ctx.save();
   ctx.globalAlpha = 0.92;
+  ctx.fillStyle = MESH_COLOR;
+  if (stable) {
+    ctx.shadowColor = MESH_COLOR;
+    ctx.shadowBlur = glow;
+  }
   for (let i = 0; i < landmarks.length; i += 1) {
-    if (LIP_INDEXES.has(i)) continue;
     const point = landmarks[i];
     const t = (zMax - point.z) / zSpan;
-    ctx.fillStyle = depthColor(t);
     ctx.beginPath();
     ctx.arc(px(point.x), py(point.y), baseRadius * (0.7 + 0.55 * t), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  // Guía nasal: puntos verdes de la dorsal y de la base de la nariz
+  // Guía nasal: mismos puntos del mesh, un pelín más grandes
   ctx.save();
-  ctx.fillStyle = '#22C55E';
+  ctx.fillStyle = MESH_COLOR;
   if (stable) {
-    ctx.shadowColor = '#22C55E';
+    ctx.shadowColor = MESH_COLOR;
     ctx.shadowBlur = glow;
   }
   const noseRadius = Math.max(1.2, Math.min(2.6, faceW * 0.008));
@@ -421,28 +349,11 @@ export function drawFaceOverlay(
   }
   ctx.restore();
 
-  // Boca: un solo color (cian HUD) - relleno translúcido + contorno e interior
+  // Ojos: puntos del contorno + anillo de iris, mismo color que el resto
   ctx.save();
-  ctx.fillStyle = 'rgba(6, 182, 212, 0.42)';
-  fillPath(ctx, landmarks, MOUTH_OUTER, px, py);
-  ctx.strokeStyle = '#06B6D4';
-  ctx.lineWidth = Math.max(1.4, Math.min(3, faceW * 0.009));
-  ctx.lineJoin = 'round';
+  ctx.fillStyle = MESH_COLOR;
   if (stable) {
-    ctx.shadowColor = '#06B6D4';
-    ctx.shadowBlur = glow;
-  }
-  strokePath(ctx, landmarks, MOUTH_OUTER, px, py);
-  ctx.strokeStyle = '#06B6D4';
-  ctx.lineWidth = Math.max(1, Math.min(2, faceW * 0.006));
-  strokePath(ctx, landmarks, MOUTH_INNER, px, py);
-  ctx.restore();
-
-  // Ojos: puntos rojos en el contorno + anillo de iris
-  ctx.save();
-  ctx.fillStyle = '#FF3B30';
-  if (stable) {
-    ctx.shadowColor = '#FF3B30';
+    ctx.shadowColor = MESH_COLOR;
     ctx.shadowBlur = glow;
   }
   const eyeDot = Math.max(1, Math.min(2.2, faceW * 0.0065));
@@ -457,7 +368,6 @@ export function drawFaceOverlay(
   const irisRadius = Math.max(0.9, Math.min(1.8, faceW * 0.005));
   const irisCenterRadius = Math.max(1, Math.min(2.2, faceW * 0.006));
   for (const set of [LEFT_IRIS, RIGHT_IRIS]) {
-    ctx.fillStyle = '#FF6B6B';
     let cx = 0;
     let cy = 0;
     let count = 0;
@@ -472,7 +382,6 @@ export function drawFaceOverlay(
       count += 1;
     }
     if (count) {
-      ctx.fillStyle = '#F43F5E';
       ctx.beginPath();
       ctx.arc(cx / count, cy / count, irisCenterRadius, 0, Math.PI * 2);
       ctx.fill();
@@ -480,11 +389,11 @@ export function drawFaceOverlay(
   }
   ctx.restore();
 
-  // Cejas: puntos violeta sobre el recorrido de la ceja
+  // Cejas: puntos sobre el recorrido de la ceja, mismo color
   ctx.save();
-  ctx.fillStyle = '#A855F7';
+  ctx.fillStyle = MESH_COLOR;
   if (stable) {
-    ctx.shadowColor = '#A855F7';
+    ctx.shadowColor = MESH_COLOR;
     ctx.shadowBlur = glow;
   }
   const browDot = Math.max(1, Math.min(2.2, faceW * 0.0065));
@@ -495,5 +404,36 @@ export function drawFaceOverlay(
     ctx.arc(px(point.x), py(point.y), browDot, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+
+  // Recuadro de detección estilo cv2.rectangle (esquinas + marco tenue)
+  ctx.save();
+  const bx = px(box.x);
+  const by = py(box.y);
+  const bw = box.width * vw * cover;
+  const bh = box.height * vh * cover;
+  const edge = Math.max(1.5, Math.min(3, faceW * 0.008));
+  const bracket = Math.max(10, Math.min(34, faceW * 0.16));
+  ctx.strokeStyle = BOX_COLOR;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.45;
+  ctx.strokeRect(bx, by, bw, bh);
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = edge;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(bx, by + bracket);
+  ctx.lineTo(bx, by);
+  ctx.lineTo(bx + bracket, by);
+  ctx.moveTo(bx + bw - bracket, by);
+  ctx.lineTo(bx + bw, by);
+  ctx.lineTo(bx + bw, by + bracket);
+  ctx.moveTo(bx + bw, by + bh - bracket);
+  ctx.lineTo(bx + bw, by + bh);
+  ctx.lineTo(bx + bw - bracket, by + bh);
+  ctx.moveTo(bx + bracket, by + bh);
+  ctx.lineTo(bx, by + bh);
+  ctx.lineTo(bx, by + bh - bracket);
+  ctx.stroke();
   ctx.restore();
 }
